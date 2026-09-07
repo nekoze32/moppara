@@ -174,7 +174,29 @@ export function render() {
   const data = el('div', { class: 'card' });
   data.append(el('h2', {}, 'データ'));
   data.append(el('div', { class: 'hint', style: 'margin-bottom:10px' },
-    '記録はこの端末のブラウザの中だけにあります。ブラウザのデータを消すと一緒に消えるので、ときどき書き出してください。'));
+    '記録はこの端末の中だけにあります。ときどき書き出してください。'));
+
+  // 「キーが消える」の原因を切り分けるための現況表示
+  const diag = el('div', { class: 'card tight', style: 'margin:0 0 12px;background:var(--surface2)' }, '確認中…');
+  data.append(diag);
+  (async () => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    let persisted = false, supported = false;
+    try {
+      supported = !!navigator.storage?.persisted;
+      persisted = supported ? await navigator.storage.persisted() : false;
+    } catch { /* 取れない環境は未対応として扱う */ }
+    const hasBackup = !!db.readMirror();
+    diag.textContent = '';
+    diag.append(
+      el('div', {}, '起動元：', el('b', {}, standalone ? 'ホーム画面のアプリ' : 'ブラウザ')),
+      el('div', { style: 'margin-top:3px' }, '保存の永続化：', el('b', {}, !supported ? '未対応' : persisted ? '許可されている' : 'まだ許可されていない')),
+      el('div', { style: 'margin-top:3px' }, '設定の控え：', el('b', {}, hasBackup ? 'あり' : 'なし')),
+      el('div', { class: 'hint', style: 'margin-top:7px' },
+        standalone
+          ? 'この状態で入れた設定は、ホーム画面のアプリ側に残ります。'
+          : 'iOSはブラウザとホーム画面アプリで別々にデータを持ちます。ホーム画面に追加したうえで、アイコンから開いて設定してください。'));
+  })();
   data.append(el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
     el('button', { class: 'btn sm', onclick: doExport }, '書き出す (JSON)'),
     el('label', { class: 'btn sm', for: 'import-file' }, '読み込む'),

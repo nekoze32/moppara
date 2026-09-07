@@ -5,6 +5,25 @@ const VERSION = 1;
 
 let _db = null;
 
+/** ブラウザに「このデータを勝手に捨てないでくれ」と申請する。iOSは渋いが、通れば残る。 */
+export async function requestPersist() {
+  try {
+    if (!navigator.storage?.persist) return { supported: false, persisted: false };
+    const already = await navigator.storage.persisted?.();
+    const persisted = already || await navigator.storage.persist();
+    return { supported: true, persisted };
+  } catch { return { supported: false, persisted: false }; }
+}
+
+/** 設定だけは localStorage にも写しておく。片方が飛んでももう片方から戻す。 */
+const MIRROR = 'moppara-settings-backup';
+export function mirrorSettings(v) {
+  try { localStorage.setItem(MIRROR, JSON.stringify(v)); } catch { /* 容量超過などは黙って諦める */ }
+}
+export function readMirror() {
+  try { return JSON.parse(localStorage.getItem(MIRROR) || 'null'); } catch { return null; }
+}
+
 function open() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {

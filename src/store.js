@@ -20,18 +20,31 @@ export const state = {
   eaten: { kcal: 0, p: 0, f: 0, c: 0 },
   exerciseKcal: 0,
   presets: [],
+  restoredFromBackup: false,
   missing: [],   // 上限を出すのに足りない項目
   ready: false,  // 全部そろったか
 };
 
 export async function init() {
-  state.settings = mergeSettings(await db.getKV('settings'));
+  await db.requestPersist();
+  let saved = await db.getKV('settings');
+  // IndexedDB側が空でも、控えが残っていれば書き戻す（キーの入れ直しを防ぐ）
+  if (!saved || !(saved.geminiKey || saved.anthropicKey)) {
+    const backup = db.readMirror();
+    if (backup && (backup.geminiKey || backup.anthropicKey)) {
+      saved = { ...(saved || {}), ...backup };
+      await db.setKV('settings', mergeSettings(saved));
+      state.restoredFromBackup = true;
+    }
+  }
+  state.settings = mergeSettings(saved);
   await refresh();
 }
 
 export async function saveSettings(patch) {
   state.settings = mergeSettings({ ...state.settings, ...patch });
   await db.setKV('settings', state.settings);
+  db.mirrorSettings(state.settings);
   await refresh();
 }
 
