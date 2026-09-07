@@ -63,38 +63,55 @@ function navigate(name) {
 
 function paintStatusBar() {
   const bar = $('#statusbar');
+  const setLabel = (t) => { $('#sb-label').textContent = t; };
+
   if (!state.ready) {
     bar.classList.remove('over', 'tight');
+    setLabel('は じ め に');
     $('#sb-kcal').textContent = '—';
-    $('#statusbar .sb-unit').textContent = 'まだ計算できません';
+    $('#sb-unit').textContent = '';
     $('#sb-date').textContent = jpDate(state.today);
+    $('#sb-detail').textContent = '';
+    $('#sb-bar').textContent = '';
     const m0 = $('#sb-macros');
     m0.textContent = '';
-    m0.append(el('span', {}, `チャットで ${state.missing.join('・')} を教えてください`));
-    $('#sb-bar-fill').style.width = '0%';
+    m0.append(el('span', { class: 'sb-setup' }, `チャットで ${state.missing.join('・')} を教えてください`));
     return;
   }
+
   const rem = remaining();
+  const b = state.budget;
   const over = rem.kcal < 0;
   const tight = !over && rem.pct > 0.85;
   bar.classList.toggle('over', over);
   bar.classList.toggle('tight', tight);
 
+  setLabel(over ? 'こ え た ぶ ん' : 'の こ り');
   $('#sb-kcal').textContent = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);
-  $('#statusbar .sb-unit').textContent = over ? 'kcal 超過' : 'kcal 残り';
-  $('#sb-date').textContent = `${jpDate(state.today)}　上限 ${fmt(state.budget?.budget)}`;
+  $('#sb-unit').textContent = 'kcal';
+  $('#sb-date').textContent = jpDate(state.today);
+  $('#sb-detail').textContent =
+    `上限 ${fmt(b?.budget)} ／ 摂取 ${fmt(state.eaten.kcal)}` + (b?.exercise ? ` ／ 運動 +${fmt(b.exercise)}` : '');
+
+  // PFCは1本のレールに束ねる。摂取したぶんだけ色が伸びる。
+  // 幅はグラムでなく kcal 換算（P4/F9/C4）。でないと脂質1gと炭水化物1gが同じ幅になり、
+  // 見た目が炭水化物に偏る。カロリー基準なら帯の数字と話が合う。
+  const rail = $('#sb-bar');
+  rail.textContent = '';
+  const t = state.targets || { p: 0, f: 0, c: 0 };
+  const KC = { p: 4, f: 9, c: 4 };
+  const totalKcal = t.p * KC.p + t.f * KC.f + t.c * KC.c || 1;
+  for (const [k, got, tgt] of [['p', state.eaten.p, t.p], ['f', state.eaten.f, t.f], ['c', state.eaten.c, t.c]]) {
+    const share = ((tgt * KC[k]) / totalKcal) * 100;           // その栄養素が持つ幅
+    const fill = clamp(tgt > 0 ? got / tgt : 0, 0, 1) * share; // うち摂った分
+    rail.append(el('i', { class: k, style: `width:${fill.toFixed(1)}%` }));
+  }
 
   const m = $('#sb-macros');
   m.textContent = '';
-  const rows = [['P', rem.p, 'm-p'], ['F', rem.f, 'm-f'], ['C', rem.c, 'm-c']];
-  for (const [label, v, cls] of rows) {
-    m.append(el('span', { class: cls }, `${label} 残り `, el('b', {}, `${v}g`)));
+  for (const [label, v, cls] of [['P', rem.p, 'm-p'], ['F', rem.f, 'm-f'], ['C', rem.c, 'm-c']]) {
+    m.append(el('span', { class: cls }, el('em', {}), `${label} 残り `, el('b', {}, `${v}g`)));
   }
-
-  const fill = $('#sb-bar-fill');
-  fill.style.width = `${clamp(rem.pct * 100, 0, 100)}%`;
-  fill.classList.toggle('over', over);
-  fill.classList.toggle('tight', tight);
 }
 
 // ---------------------------------------------------------------- ショートカット連携

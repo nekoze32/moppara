@@ -120,3 +120,18 @@ export function toast(msg, ms = 2200) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
+
+/** 消す前に確認ダイアログを出さず、消してから取り消せるようにする。 */
+export function undoToast(msg, onUndo, ms = 5000) {
+  const t = document.getElementById('toast');
+  t.textContent = '';
+  t.append(document.createTextNode(msg));
+  const btn = el('button', {
+    style: 'margin-left:12px;color:inherit;text-decoration:underline;font-size:13px;font-weight:700',
+    onclick: async () => { clearTimeout(toastTimer); t.hidden = true; await onUndo(); },
+  }, '取り消す');
+  t.append(btn);
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}

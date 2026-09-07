@@ -4,13 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="description" content="もっぱら、食事管理だけ。写真か一言を送るだけで記録できるAIトレーナー。">
-<meta name="theme-color" content="#C2552F">
+<meta name="theme-color" content="#F2F3F0">
 <title>Moppara</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Moppara">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Shippori+Mincho+B1:wght@500&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,13 +21,15 @@
 <!-- ===== 常時見える残量バー ===== -->
 <header id="statusbar" class="statusbar" role="button" tabindex="0" aria-label="今日の残量。タップで今日の画面へ">
   <div class="sb-main">
-    <div class="sb-remain">
-      <span class="sb-num" id="sb-kcal">—</span><span class="sb-unit">kcal 残り</span>
-    </div>
-    <div class="sb-date" id="sb-date"></div>
+    <span class="sb-label" id="sb-label">の こ り</span>
+    <span class="sb-date" id="sb-date"></span>
   </div>
+  <div class="sb-remain">
+    <span class="sb-num" id="sb-kcal">—</span><span class="sb-unit" id="sb-unit">kcal</span>
+  </div>
+  <div class="sb-detail" id="sb-detail"></div>
+  <div class="sb-bar" id="sb-bar"></div>
   <div class="sb-macros" id="sb-macros"></div>
-  <div class="sb-bar"><div class="sb-bar-fill" id="sb-bar-fill"></div></div>
 </header>
 
 <main id="main">
