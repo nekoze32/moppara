@@ -145,14 +145,19 @@ async function send() {
   const thumb = img ? await thumbnail(img) : null;
   logEl.append(userBubble(text, thumb));
   scrollDown();
+  await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'user', text: text || '（写真）', thumb });
 
+  await deliver(text, img);
+}
+
+/** 送信の本体。失敗しても同じ引数で呼び直せるようにしてある。 */
+async function deliver(text, img) {
   const at = new Date().toISOString();
-  await db.putChat({ id: uid(), at, role: 'user', text: text || '（写真）', thumb });
-
   setBusy(true);
+
+  const label = el('span', {}, img ? ' 写真を見ています' : ' 考えています');
   const thinking = el('div', { class: 'msg ai thinking' },
-    el('span', { class: 'dots', html: '<span></span><span></span><span></span>' }),
-    img ? ' 写真を見ています' : ' 考えています');
+    el('span', { class: 'dots', html: '<span></span><span></span><span></span>' }), label);
   logEl.append(thinking);
   scrollDown();
 
@@ -161,7 +166,15 @@ async function send() {
     const context = contextBlock({ presets: state.presets, recent });
     const history = (await db.allChat()).slice(-9, -1).map((r) => ({ role: r.role, text: r.text }));
 
-    const out = await ask({ settings: state.settings, context, history, text, imageDataUrl: img });
+    const out = await ask({
+      settings: state.settings, context, history, text, imageDataUrl: img,
+      onRetry: ({ attempt, of, status, wait }) => {
+        label.textContent = status === 429
+          ? ` 立て込んでいます。${Math.round(wait / 1000)}秒待って${attempt + 1}回目（全${of}回）`
+          : ` 向こうが混み合っています。やり直し中 ${attempt + 1}/${of}`;
+        scrollDown();
+      },
+    });
     thinking.remove();
 
     // 体重・運動は迷いようがないのでその場で入れる
@@ -182,16 +195,20 @@ async function send() {
     }
     if (side.length) logEl.append(el('div', { class: 'msg sys' }, side.join(' / ')));
 
-    if (out.meal) logEl.append(proposeCard(out.meal, { thumb, fromPhoto: !!img }));
+    if (out.meal) logEl.append(proposeCard(out.meal, { thumb: img ? await thumbnail(img) : null, fromPhoto: !!img }));
 
     await db.trimChat(300);
     scrollDown();
   } catch (err) {
     thinking.remove();
     const msg = err instanceof AIError ? err.message
-      : err.name === 'TypeError' ? '通信できませんでした。電波とAPIキーを確認してください。'
+      : err.name === 'TypeError' ? '通信できませんでした。電波を確認してください。'
       : err.message || '不明なエラーです。';
-    logEl.append(el('div', { class: 'msg err' }, msg));
+    // 打ち直させない。同じ内容をそのまま送り直せるようにする。
+    const again = el('button', { class: 'btn sm', style: 'margin-top:8px' }, 'もう一度送る');
+    const box = el('div', { class: 'msg err' }, msg, el('div', {}, again));
+    again.addEventListener('click', () => { box.remove(); deliver(text, img); });
+    logEl.append(box);
     scrollDown();
   } finally {
     setBusy(false);

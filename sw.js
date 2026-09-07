@@ -1,5 +1,5 @@
 // オフラインでも記録の閲覧と入力ができるようにする。AI呼び出しだけはネットが要る。
-const CACHE = 'moppara-v1';
+const CACHE = 'moppara-v2';
 const SHELL = [
   './',
   'index.html',
@@ -37,9 +37,18 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;                       // APIのPOSTは素通し
   if (new URL(req.url).origin !== location.origin) return; // 外部（AI）は素通し
 
-  // ネット優先。更新がそのまま反映され、圏外ではキャッシュで動く。
+  // ネット優先。さらに no-cache を付けてブラウザのHTTPキャッシュを必ず検証させる。
+  // これが無いと、更新を出しても端末が古いJSを掴んだままになる（実際に踏んだ）。
+  const fresh = new Request(req.url, {
+    method: 'GET',
+    headers: req.headers,
+    mode: req.mode === 'navigate' ? 'same-origin' : req.mode,
+    credentials: 'same-origin',
+    redirect: 'follow',
+    cache: 'no-cache',
+  });
   e.respondWith(
-    fetch(req)
+    fetch(fresh)
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;

@@ -7,6 +7,32 @@ import { dataUrlParts } from './util.js';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const ANTHROPIC_BASE = 'https://api.anthropic.com/v1';
 
+// 一時的な失敗（混雑・瞬断）は自動で数回やり直す。ここが無いと503がそのまま利用者に出る。
+const RETRYABLE = new Set([408, 429, 500, 502, 503, 504, 529]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchRetry(url, opts, { tries = 3, onRetry } = {}) {
+  let lastErr = null;
+  for (let i = 1; i <= tries; i++) {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok || !RETRYABLE.has(res.status) || i === tries) return res;
+      const ra = Number(res.headers.get('retry-after'));
+      const wait = Math.min(8000, ra > 0 ? ra * 1000 : i * 1800 + Math.random() * 600);
+      onRetry?.({ attempt: i, of: tries, status: res.status, wait });
+      await sleep(wait);
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;   // 利用者が中断したときはやり直さない
+      lastErr = e;
+      if (i === tries) throw e;
+      const wait = i * 1500;
+      onRetry?.({ attempt: i, of: tries, status: 0, wait });
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
 export const PROVIDERS = {
   gemini: {
     label: 'Google Gemini',
@@ -121,14 +147,14 @@ function guessSlot(d = new Date()) {
  * @param {string} p.text      今回の発話
  * @param {string} [p.imageDataUrl]
  */
-export async function ask({ settings, context, history = [], text, imageDataUrl, signal }) {
+export async function ask({ settings, context, history = [], text, imageDataUrl, signal, onRetry }) {
   const provider = settings.provider === 'anthropic' ? 'anthropic' : 'gemini';
-  if (provider === 'anthropic') return askAnthropic({ settings, context, history, text, imageDataUrl, signal });
-  return askGemini({ settings, context, history, text, imageDataUrl, signal });
+  const p = { settings, context, history, text, imageDataUrl, signal, onRetry };
+  return provider === 'anthropic' ? askAnthropic(p) : askGemini(p);
 }
 
 // ---- Gemini ----
-async function askGemini({ settings, context, history, text, imageDataUrl, signal }) {
+async function askGemini({ settings, context, history, text, imageDataUrl, signal, onRetry }) {
   const key = settings.geminiKey?.trim();
   if (!key) throw new AIError('GeminiのAPIキーが設定されていません。設定タブで入れてください。');
   const model = (settings.geminiModel || PROVIDERS.gemini.defaultModel).replace(/^models\//, '');
@@ -153,12 +179,12 @@ async function askGemini({ settings, context, history, text, imageDataUrl, signa
     },
   };
 
-  const res = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
+  const res = await fetchRetry(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify(body),
     signal,
-  });
+  }, { onRetry });
 
   const json = await readJson(res);
   if (!res.ok) throw new AIError(geminiError(res.status, json, model));
@@ -176,11 +202,13 @@ function geminiError(status, json, model) {
   if (status === 404) return `モデル「${model}」がこのキーでは使えません。設定タブの「使えるモデルを取得」で選び直してください。`;
   if (status === 429) return '無料枠の上限（1分あたり／1日あたりの回数）に当たりました。しばらく置いて試してください。';
   if (status === 403) return 'このAPIキーには権限がありません。Google AI Studioで作り直してください。';
+  if (status === 503) return `Google側が混み合っています（503）。3回やり直しても駄目でした。数分置くか、設定の「使えるモデルを取得」で別のFlashモデルに変えてみてください。`;
+  if (status >= 500) return `Google側の一時的な不具合です（${status}）。少し置いてもう一度どうぞ。`;
   return `Geminiでエラー（${status}）${msg ? '：' + msg : ''}`;
 }
 
 // ---- Anthropic ----
-async function askAnthropic({ settings, context, history, text, imageDataUrl, signal }) {
+async function askAnthropic({ settings, context, history, text, imageDataUrl, signal, onRetry }) {
   const key = settings.anthropicKey?.trim();
   if (!key) throw new AIError('AnthropicのAPIキーが設定されていません。設定タブで入れてください。');
   const model = settings.anthropicModel || PROVIDERS.anthropic.defaultModel;
@@ -205,7 +233,7 @@ async function askAnthropic({ settings, context, history, text, imageDataUrl, si
     tool_choice: { type: 'tool', name: 'respond' },
   };
 
-  const res = await fetch(`${ANTHROPIC_BASE}/messages`, {
+  const res = await fetchRetry(`${ANTHROPIC_BASE}/messages`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -215,7 +243,7 @@ async function askAnthropic({ settings, context, history, text, imageDataUrl, si
     },
     body: JSON.stringify(body),
     signal,
-  });
+  }, { onRetry });
 
   const json = await readJson(res);
   if (!res.ok) throw new AIError(anthropicError(res.status, json, model));
@@ -235,6 +263,8 @@ function anthropicError(status, json, model) {
   if (status === 404 || /model/i.test(msg) && status === 400) return `モデル「${model}」が使えません。設定タブの「使えるモデルを取得」で選び直してください。`;
   if (status === 429) return 'レート上限に当たりました。少し置いて試してください。';
   if (status === 400 && /credit|balance/i.test(msg)) return 'Anthropicの残高が足りません。コンソールでクレジットを追加してください。';
+  if (status === 529) return 'Anthropic側が混み合っています（529）。3回やり直しても駄目でした。少し置いてもう一度どうぞ。';
+  if (status >= 500) return `Anthropic側の一時的な不具合です（${status}）。少し置いてもう一度どうぞ。`;
   return `Anthropicでエラー（${status}）${msg ? '：' + msg : ''}`;
 }
 
