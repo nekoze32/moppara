@@ -91,7 +91,9 @@ a{color:var(--accent)}
 .sb-macros em{width:7px;height:7px;border-radius:2px;font-style:normal;flex:0 0 auto}
 .sb-macros .m-p em{background:var(--p)} .sb-macros .m-f em{background:var(--f)} .sb-macros .m-c em{background:var(--c)}
 .sb-macros b{font-weight:700;color:var(--ink)}
-.sb-setup{font-size:12px;color:var(--ink-soft);padding-bottom:10px;line-height:1.55}
+.sb-setup{font-size:12.5px;color:var(--ink-soft);padding:2px 0 12px;line-height:1.6}
+.statusbar.setup .sb-remain,.statusbar.setup .sb-bar,.statusbar.setup .sb-detail{display:none}
+.statusbar.setup .sb-main{margin-bottom:2px}
 
 /* ---------- レイアウト ---------- */
 #main{flex:1 1 auto;min-height:0;display:flex}

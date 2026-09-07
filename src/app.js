@@ -67,17 +67,17 @@ function paintStatusBar() {
 
   if (!state.ready) {
     bar.classList.remove('over', 'tight');
+    bar.classList.add('setup');
     setLabel('は じ め に');
-    $('#sb-kcal').textContent = '—';
-    $('#sb-unit').textContent = '';
     $('#sb-date').textContent = jpDate(state.today);
-    $('#sb-detail').textContent = '';
     $('#sb-bar').textContent = '';
     const m0 = $('#sb-macros');
     m0.textContent = '';
-    m0.append(el('span', { class: 'sb-setup' }, `チャットで ${state.missing.join('・')} を教えてください`));
+    m0.append(el('span', { class: 'sb-setup' },
+      `あと ${state.missing.join('・')}。チャットで教えてください。`));
     return;
   }
+  bar.classList.remove('setup');
 
   const rem = remaining();
   const b = state.budget;
