@@ -24,10 +24,25 @@ export function readMirror() {
   try { return JSON.parse(localStorage.getItem(MIRROR) || 'null'); } catch { return null; }
 }
 
+export let storageError = null;
+
 function open() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
+    // 別タブが古い版を掴んでいる・削除が保留中、といった場合 open は
+    // onblocked のまま黙って止まる。放置すると起動が完了せず画面が空になる。
+    let settled = false;
+    const fail = (msg) => {
+      if (settled) return;
+      settled = true;
+      storageError = msg;
+      reject(new Error(msg));
+    };
+    const timer = setTimeout(() => fail('保存領域を開けませんでした（時間切れ）'), 5000);
+    const done = (v) => { if (settled) return; settled = true; clearTimeout(timer); resolve(v); };
+
     const req = indexedDB.open(NAME, VERSION);
+    req.onblocked = () => fail('ほかのタブでこのアプリが開いています。そちらを閉じてから開き直してください。');
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
@@ -43,8 +58,8 @@ function open() {
       if (!db.objectStoreNames.contains('chat')) db.createObjectStore('chat', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('presets')) db.createObjectStore('presets', { keyPath: 'id' });
     };
-    req.onsuccess = () => { _db = req.result; resolve(_db); };
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { _db = req.result; done(_db); };
+    req.onerror = () => fail(req.error?.message || '保存領域を開けませんでした');
   });
 }
 

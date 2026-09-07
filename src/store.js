@@ -20,6 +20,7 @@ export const state = {
   eaten: { kcal: 0, p: 0, f: 0, c: 0 },
   exerciseKcal: 0,
   presets: [],
+  storageError: null,
   restoredFromBackup: false,
   missing: [],   // 上限を出すのに足りない項目
   ready: false,  // 全部そろったか
@@ -27,7 +28,16 @@ export const state = {
 
 export async function init() {
   await db.requestPersist();
-  let saved = await db.getKV('settings');
+  let saved = null;
+  try {
+    saved = await db.getKV('settings');
+  } catch (e) {
+    // 保存領域が開けなくてもアプリは立ち上げる。黙って空画面にしない。
+    state.storageError = e.message || '保存領域を開けませんでした';
+    state.settings = mergeSettings(db.readMirror());
+    await refresh().catch(() => {});
+    return;
+  }
   // IndexedDB側が空でも、控えが残っていれば書き戻す（キーの入れ直しを防ぐ）
   if (!saved || !(saved.geminiKey || saved.anthropicKey)) {
     const backup = db.readMirror();
@@ -71,11 +81,13 @@ export function currentDay() {
 
 export async function refresh() {
   state.today = currentDay();
-  state.meals = await db.mealsOf(state.today);
-  state.activities = await db.activitiesOf(state.today);
-  state.presets = await db.allPresets();
+  try {
+    state.meals = await db.mealsOf(state.today);
+    state.activities = await db.activitiesOf(state.today);
+    state.presets = await db.allPresets();
+  } catch { state.meals = []; state.activities = []; state.presets = []; }
 
-  const weights = await db.allWeights();
+  const weights = await db.allWeights().catch(() => []);
   state.weight = weights.find((w) => w.day === state.today) || null;
   state.latestWeight = weights.length ? weights[weights.length - 1] : null;
 

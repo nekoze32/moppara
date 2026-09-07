@@ -34,6 +34,16 @@ async function boot() {
 
   paintStatusBar();
 
+  if (state.storageError) {
+    const w = $('#warnbar');
+    w.textContent = '';
+    w.append(
+      el('div', {}, `記録を保存できません：${state.storageError}`),
+      el('div', { style: 'margin-top:3px;opacity:.85' },
+        'ほかのタブでこのアプリを開いていないか確かめて、開き直してください。いま入れたものは残りません。'));
+    w.hidden = false;
+  }
+
   await handleHash();
   window.addEventListener('hashchange', handleHash);
 
