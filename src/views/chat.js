@@ -2,7 +2,7 @@
 
 import { $, el, uid, toast, shrinkImage, sumItems, fmt, r1 } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, recentDays, hasKey } from '../store.js';
+import { state, refresh, currentDay, recentDays, hasKey, applySetup } from '../store.js';
 import { ask, AIError } from '../ai.js';
 import { contextBlock } from '../prompts.js';
 
@@ -70,16 +70,24 @@ function dayLabel(iso) {
 }
 
 function greet() {
-  const lines = [
-    'こんにちは。食べたものを写真か一言で送ってください。',
-    '',
-    '  ・写真を撮る（カメラのボタン）',
-    '  ・「かけそばとおにぎり1個」',
-    '  ・「体重72.4」「30分走った」',
-    '  ・「今夜の外食どこがいい？」',
-    '',
-    'どれもこの入力欄で受け付けます。',
-  ];
+  const lines = state.ready
+    ? [
+        'こんにちは。食べたものを写真か一言で送ってください。',
+        '',
+        '  ・写真を撮る（カメラのボタン）',
+        '  ・「かけそばとおにぎり1個」',
+        '  ・「体重72.4」「30分走った」',
+        '  ・「今夜の外食どこがいい？」',
+        '',
+        'どれもこの入力欄で受け付けます。',
+      ]
+    : [
+        'はじめまして。',
+        '',
+        '1日にどれくらい食べていいかを出したいので、先に2つだけ教えてください。',
+        '',
+        '身長と、いまの体重はどれくらいですか。',
+      ];
   logEl.append(el('div', { class: 'msg ai' }, lines.join('\n')));
 }
 
@@ -108,6 +116,7 @@ function clearAttachment() {
 
 async function renderChips() {
   chipsEl.textContent = '';
+  if (!state.ready) return;   // 聞き取りが終わるまでは余計な選択肢を出さない
   const chips = [];
   for (const p of (state.presets || []).slice(0, 3)) chips.push(`いつもの${p.name}`);
   if (!state.weight) chips.push('体重を記録');
@@ -177,8 +186,11 @@ async function deliver(text, img) {
     });
     thinking.remove();
 
-    // 体重・運動は迷いようがないのでその場で入れる
+    // 体重・運動・聞き取りは迷いようがないのでその場で入れる
     const side = [];
+    const wasReady = state.ready;
+    const got = await applySetup(out.setup);
+    if (got.length) side.push(`${got.join('・')}を登録`);
     if (out.weight) {
       await db.putWeight({ day: currentDay(), kg: out.weight.kg, fatPct: out.weight.fatPct, at });
       side.push(`体重 ${out.weight.kg}kg を記録`);
@@ -194,6 +206,18 @@ async function deliver(text, img) {
       await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'assistant', text: out.reply });
     }
     if (side.length) logEl.append(el('div', { class: 'msg sys' }, side.join(' / ')));
+
+    // 聞き取りが今そろったなら、上限は推測でなくアプリが計算して出す
+    if (!wasReady && state.ready) {
+      const t = state.targets, b = state.budget;
+      logEl.append(el('div', { class: 'msg ai' },
+        [`これで計算できます。`,
+         ``,
+         `1日の上限　${fmt(b.budget)} kcal`,
+         `P ${t.p}g　F ${t.f}g　C ${t.c}g`,
+         ``,
+         `写真か一言を送れば記録します。上の帯にいつでも残りが出ます。`].join(String.fromCharCode(10))));
+    }
 
     if (out.meal) logEl.append(proposeCard(out.meal, { thumb: img ? await thumbnail(img) : null, fromPhoto: !!img }));
 

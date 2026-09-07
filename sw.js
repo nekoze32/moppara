@@ -1,5 +1,5 @@
 // オフラインでも記録の閲覧と入力ができるようにする。AI呼び出しだけはネットが要る。
-const CACHE = 'moppara-v2';
+const CACHE = 'moppara-v3';
 const SHELL = [
   './',
   'index.html',
@@ -12,6 +12,7 @@ const SHELL = [
   'src/nutrition.js',
   'src/prompts.js',
   'src/ai.js',
+  'src/views/welcome.js',
   'src/views/chat.js',
   'src/views/today.js',
   'src/views/trend.js',

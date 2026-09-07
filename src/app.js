@@ -2,7 +2,8 @@
 
 import { $, $$, el, fmt, r0, clamp, jpDate, uid, toast } from './util.js';
 import * as db from './db.js';
-import { init as initStore, onChange, state, remaining, refresh, currentDay } from './store.js';
+import { init as initStore, onChange, state, remaining, refresh, currentDay, hasKey } from './store.js';
+import * as welcome from './views/welcome.js';
 import * as chat from './views/chat.js';
 import * as today from './views/today.js';
 import * as trend from './views/trend.js';
@@ -14,6 +15,7 @@ async function boot() {
   settings.applyTheme();
   await initStore();
 
+  welcome.mount({ navigate });
   chat.mount({ navigate });
   today.mount({ navigate });
   trend.mount();
@@ -41,9 +43,7 @@ async function boot() {
     if (!document.hidden && state.today !== currentDay()) refresh();
   });
 
-  if (!state.settings.geminiKey && !state.settings.anthropicKey) {
-    navigate('settings');
-  }
+  if (!hasKey()) navigate('welcome');
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
@@ -52,16 +52,29 @@ async function boot() {
 
 function navigate(name) {
   current = name;
+  document.body.classList.toggle('onboarding', name === 'welcome');
   for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
   for (const b of $$('#tabbar .tab')) b.classList.toggle('is-on', b.dataset.go === name);
+  if (name === 'welcome') welcome.render();
   if (name === 'today') today.render();
   if (name === 'trend') trend.render();
   if (name === 'settings') settings.render();
 }
 
 function paintStatusBar() {
-  const rem = remaining();
   const bar = $('#statusbar');
+  if (!state.ready) {
+    bar.classList.remove('over', 'tight');
+    $('#sb-kcal').textContent = '—';
+    $('#statusbar .sb-unit').textContent = 'まだ計算できません';
+    $('#sb-date').textContent = jpDate(state.today);
+    const m0 = $('#sb-macros');
+    m0.textContent = '';
+    m0.append(el('span', {}, `チャットで ${state.missing.join('・')} を教えてください`));
+    $('#sb-bar-fill').style.width = '0%';
+    return;
+  }
+  const rem = remaining();
   const over = rem.kcal < 0;
   const tight = !over && rem.pct > 0.85;
   bar.classList.toggle('over', over);

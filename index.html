@@ -29,6 +29,28 @@
 
 <main id="main">
 
+  <!-- ===== 初回のようこそ（APIキーだけ聞く） ===== -->
+  <section class="screen" id="screen-welcome" data-screen="welcome" hidden>
+    <div class="scroll welcome">
+      <img class="w-icon" src="icons/icon-192.png" alt="">
+      <h1 class="w-title">Moppara</h1>
+      <p class="w-sub">もっぱら、食事管理だけ。</p>
+      <ul class="w-points">
+        <li>食べたものを<b>写真か一言</b>で送るだけ</li>
+        <li>カロリーとPFCを見積もって、<b>残りいくら</b>かを出す</li>
+        <li>「今夜どこで何を食べていい？」に<b>品目と個数</b>で答える</li>
+      </ul>
+      <p class="w-lead">はじめにAPIキーだけ教えてください。<br>身長や目標は、このあとチャットで聞きます。</p>
+      <div class="w-choice" id="w-choice"></div>
+      <div class="field">
+        <input type="password" id="w-key" placeholder="キーを貼り付け" autocomplete="off" spellcheck="false">
+        <div class="hint" id="w-hint"></div>
+      </div>
+      <button class="btn primary w-start" id="w-start">はじめる</button>
+      <p class="w-note">キーはこの端末の中だけに保存されます。記録もこの端末から出ません。</p>
+    </div>
+  </section>
+
   <!-- ===== チャット ===== -->
   <section class="screen" id="screen-chat" data-screen="chat">
     <div class="chat-log" id="chat-log"></div>

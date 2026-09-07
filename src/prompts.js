@@ -19,6 +19,17 @@ export const SYSTEM = `あなたは日本語で応対する食事管理のパー
 - 「いつもの◯◯」のように過去の記録を指している場合は、下の【いつも食べているもの】から数値をそのまま使う。
 - 時間帯から slot（朝／昼／夜／間食）を判断する。文章に指定があればそちらを優先する。
 
+## はじめての聞き取り
+【まだ聞けていないこと】が出ている間は、これを埋めるのが最優先です。食事の記録より先に聞いてください。
+- **一度に聞くのは1〜2項目まで。**全部まとめて聞かない。フォームのように箇条書きで並べない。
+- 聞けた項目だけ setup に入れる。聞けていない項目は入れない（推測で埋めない）。
+- 年齢を言われたら birthYear に西暦で入れる。「38歳」なら今年から38を引く。
+- 「デスクワーク」「運動していない」は activity を sedentary に。
+- 体重を言われたら setup ではなく weight に入れる。
+- 目標体重だけ言われて期限が無ければ targetDate は入れない。急かさない。
+- **上限カロリーやPFCの数字を、聞き取り中に自分で言わないこと。**その時点ではまだ計算できていないので、言えば必ず外れます。数字はアプリが出します。
+- 最後の項目が埋まったときは「これで計算できます」と一言だけ返す。数字は書かない。
+
 ## 相談に答えるとき
 - 「今夜どこで何を食べたらいい？」「回転寿司で何皿まで？」のような相談では meal は null にして、reply に**具体的な品目と個数・グラム数**を書く。「バランスよく」「食べ過ぎに注意」のような一般論は書かない。
 - 残りカロリーとPFCの中に収まる案を出す。残りが少ない日は「何を諦めるか」まで言う。
@@ -65,6 +76,19 @@ export const SCHEMA_FIELDS = {
     properties: { kg: { type: 'number' }, fatPct: { type: 'number' } },
     required: ['kg'],
   },
+  setup: {
+    type: 'object',
+    description: '初期の聞き取りで、この発話から確定した項目だけを入れる。聞けていない項目は入れない。',
+    properties: {
+      sex: { type: 'string', enum: ['male', 'female'] },
+      birthYear: { type: 'number', description: '生まれた西暦' },
+      heightCm: { type: 'number' },
+      activity: { type: 'string', enum: ['sedentary', 'light', 'moderate', 'active'] },
+      goalMode: { type: 'string', enum: ['diet', 'maintain', 'bulk'] },
+      targetWeightKg: { type: 'number' },
+      targetDate: { type: 'string', description: 'YYYY-MM-DD' },
+    },
+  },
   activity: {
     type: 'object',
     description: '運動の申告があった場合のみ。無ければ null。消費カロリーは体重から見積もる。',
@@ -90,6 +114,21 @@ export function contextBlock({ presets = [], recent = [] } = {}) {
 
   L.push(`【いまの状況】`);
   L.push(`日時: ${jpDate(state.today)} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`);
+
+  if (!state.ready) {
+    L.push(`★【まだ聞けていないこと】${state.missing.join('・')}`);
+    L.push(`これが埋まるまで1日の上限は計算できません。1〜2項目ずつ会話で聞いてください。`);
+    const p = s.profile;
+    L.push(`聞けているもの: ${[
+      p.sex ? `性別=${p.sex === 'female' ? '女性' : '男性'}` : null,
+      p.birthYear ? `生まれ年=${p.birthYear}` : null,
+      p.heightCm ? `身長=${p.heightCm}cm` : null,
+      kg != null ? `体重=${kg}kg` : null,
+      s.goal.targetWeightKg ? `目標体重=${s.goal.targetWeightKg}kg` : null,
+    ].filter(Boolean).join(' / ') || 'まだ何も'}`);
+    if (s.prefs?.trim()) L.push(`【好み・制限】${s.prefs.trim()}`);
+    return L.join('\n');
+  }
 
   const g = s.goal;
   if (g.mode === 'diet' && g.targetWeightKg) {

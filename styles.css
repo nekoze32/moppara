@@ -255,3 +255,25 @@ table.tbl{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeri
 table.tbl th,table.tbl td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 table.tbl th:first-child,table.tbl td:first-child{text-align:left}
 table.tbl th{color:var(--ink-faint);font-weight:600;font-size:11px}
+
+/* ---------- 初回のようこそ ---------- */
+.welcome{max-width:460px;margin:0 auto;text-align:center;padding-top:28px}
+.w-icon{width:66px;height:66px;border-radius:16px;box-shadow:var(--shadow)}
+.w-title{font-size:27px;font-weight:800;letter-spacing:.01em;margin:14px 0 2px}
+.w-sub{color:var(--ink-soft);font-size:14px;margin:0 0 22px}
+.w-points{list-style:none;padding:0;margin:0 0 22px;text-align:left;display:flex;flex-direction:column;gap:9px}
+.w-points li{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 13px;font-size:13.5px;line-height:1.6}
+.w-lead{font-size:14px;line-height:1.75;margin:0 0 16px}
+.w-choice{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+.w-card{text-align:left;padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface)}
+.w-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.w-card-t{font-size:11px;color:var(--ink-faint);margin-bottom:2px}
+.w-card.on .w-card-t{color:var(--accent)}
+.w-card-n{font-size:13.5px;font-weight:700;line-height:1.35}
+.w-card-p{font-size:11.5px;color:var(--ink-soft);margin-top:3px}
+.welcome .field{text-align:left;margin-bottom:14px}
+.w-start{width:100%;padding:13px;font-size:15px}
+.w-note{font-size:11.5px;color:var(--ink-faint);margin:14px 0 0;line-height:1.7}
+body.onboarding .statusbar,body.onboarding .tabbar{display:none}
+body.onboarding .scroll{padding-bottom:32px}
+.sb-setup{font-size:13px;color:var(--ink-soft);padding:2px 0 8px;line-height:1.5}

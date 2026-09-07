@@ -1,7 +1,7 @@
 // アプリの状態。設定と「今日の集計」をここで持ち、変わったら購読者に投げる。
 
 import * as db from './db.js';
-import { mergeSettings, dailyBudget, macroTargets, DEFAULT_SETTINGS } from './nutrition.js';
+import { mergeSettings, dailyBudget, macroTargets, missingProfile, DEFAULT_SETTINGS } from './nutrition.js';
 import { mealDay, sumMeals, ymd, addDays, r0 } from './util.js';
 
 const listeners = new Set();
@@ -20,6 +20,8 @@ export const state = {
   eaten: { kcal: 0, p: 0, f: 0, c: 0 },
   exerciseKcal: 0,
   presets: [],
+  missing: [],   // 上限を出すのに足りない項目
+  ready: false,  // 全部そろったか
 };
 
 export async function init() {
@@ -31,6 +33,23 @@ export async function saveSettings(patch) {
   state.settings = mergeSettings({ ...state.settings, ...patch });
   await db.setKV('settings', state.settings);
   await refresh();
+}
+
+/** AIが会話から聞き取った項目だけを設定へ反映する。 */
+export async function applySetup(setup) {
+  if (!setup) return [];
+  const s = structuredClone(state.settings);
+  const got = [];
+  const P = { sex: '性別', birthYear: '生まれ年', heightCm: '身長', activity: '活動量' };
+  for (const k of Object.keys(P)) {
+    if (setup[k] != null && setup[k] !== '') { s.profile[k] = setup[k]; got.push(P[k]); }
+  }
+  if (setup.goalMode) { s.goal.mode = setup.goalMode; got.push('目標'); }
+  if (setup.targetWeightKg != null) { s.goal.targetWeightKg = setup.targetWeightKg; got.push('目標体重'); }
+  if (setup.targetDate) { s.goal.targetDate = setup.targetDate; got.push('目標の日'); }
+  if (!got.length) return [];
+  await saveSettings(s);
+  return got;
 }
 
 export function currentDay() {
@@ -47,7 +66,10 @@ export async function refresh() {
   state.weight = weights.find((w) => w.day === state.today) || null;
   state.latestWeight = weights.length ? weights[weights.length - 1] : null;
 
-  const kg = state.weight?.kg ?? state.latestWeight?.kg ?? state.settings.goal.startWeightKg ?? 70;
+  const known = state.weight?.kg ?? state.latestWeight?.kg ?? state.settings.goal.startWeightKg ?? null;
+  state.missing = missingProfile(state.settings, known);
+  state.ready = state.missing.length === 0;
+  const kg = known ?? 70;
   state.exerciseKcal = state.activities.reduce((a, x) => a + (Number(x.kcal) || 0), 0);
   state.budget = dailyBudget(state.settings, kg, state.exerciseKcal, state.today);
   state.targets = macroTargets(state.settings, state.budget.budget, kg);

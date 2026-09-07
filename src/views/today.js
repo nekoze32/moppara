@@ -18,12 +18,10 @@ export function render() {
   const b = state.budget;
   root.textContent = '';
 
-  const needsSetup = !state.settings.profile.heightCm
-    || (state.settings.goal.mode !== 'maintain' && !state.settings.goal.targetWeightKg);
-  if (needsSetup) {
+  if (!state.ready) {
     root.append(el('div', { class: 'banner' },
-      '身長・体重・目標がまだ空です。ここを埋めないと上限カロリーが正しく出ません。',
-      el('div', {}, el('button', { class: 'btn sm primary', onclick: () => goTab('settings') }, '設定を開く'))));
+      `まだ聞けていないもの：${state.missing.join('・')}。これが埋まるまで上限カロリーは出せません。`,
+      el('div', {}, el('button', { class: 'btn sm primary', onclick: () => goTab('chat') }, 'チャットで答える'))));
   }
 
   // ---- リングと内訳 ----

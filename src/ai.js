@@ -90,7 +90,7 @@ const num = (v) => {
 /** モデルの返しがどう崩れていても、アプリが扱える形に均す。 */
 export function coerce(raw) {
   const o = raw && typeof raw === 'object' ? raw : {};
-  const out = { reply: String(o.reply || '').trim(), meal: null, weight: null, activity: null };
+  const out = { reply: String(o.reply || '').trim(), meal: null, weight: null, activity: null, setup: null };
 
   const m = o.meal;
   if (m && typeof m === 'object' && Array.isArray(m.items) && m.items.length) {
@@ -118,6 +118,19 @@ export function coerce(raw) {
   const w = o.weight;
   if (w && num(w.kg) > 20 && num(w.kg) < 300) {
     out.weight = { kg: Math.round(num(w.kg) * 10) / 10, fatPct: num(w.fatPct) > 0 ? Math.round(num(w.fatPct) * 10) / 10 : null };
+  }
+
+  const st = o.setup;
+  if (st && typeof st === 'object') {
+    const out2 = {};
+    if (st.sex === 'male' || st.sex === 'female') out2.sex = st.sex;
+    if (num(st.birthYear) > 1900 && num(st.birthYear) < new Date().getFullYear()) out2.birthYear = Math.round(num(st.birthYear));
+    if (num(st.heightCm) > 80 && num(st.heightCm) < 250) out2.heightCm = Math.round(num(st.heightCm) * 10) / 10;
+    if (['sedentary', 'light', 'moderate', 'active'].includes(st.activity)) out2.activity = st.activity;
+    if (['diet', 'maintain', 'bulk'].includes(st.goalMode)) out2.goalMode = st.goalMode;
+    if (num(st.targetWeightKg) > 20 && num(st.targetWeightKg) < 300) out2.targetWeightKg = Math.round(num(st.targetWeightKg) * 10) / 10;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(st.targetDate || ''))) out2.targetDate = st.targetDate;
+    if (Object.keys(out2).length) out.setup = out2;
   }
 
   const a = o.activity;

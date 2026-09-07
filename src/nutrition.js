@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS = {
   anthropicKey: '',
   geminiModel: 'gemini-3.8-flash',
   anthropicModel: 'claude-haiku-4-5',
-  profile: { sex: 'male', birthYear: 1990, heightCm: 170, activity: 'sedentary' },
+  profile: { sex: null, birthYear: null, heightCm: null, activity: 'sedentary' },
   goal: {
     mode: 'diet',            // diet | maintain | bulk
     startWeightKg: null,
@@ -46,6 +46,17 @@ export function mergeSettings(saved) {
 
 export function ageOf(birthYear, at = new Date()) {
   return clamp(at.getFullYear() - Number(birthYear || 1990), 10, 100);
+}
+
+/** 上限カロリーを出すのに足りない項目。空なら計算できる。 */
+export function missingProfile(settings, weightKg) {
+  const m = [];
+  if (!settings.profile.sex) m.push('性別');
+  if (!settings.profile.birthYear) m.push('生まれ年');
+  if (!settings.profile.heightCm) m.push('身長');
+  if (weightKg == null) m.push('いまの体重');
+  if (settings.goal.mode !== 'maintain' && !settings.goal.targetWeightKg) m.push('目標体重');
+  return m;
 }
 
 // Mifflin-St Jeor
