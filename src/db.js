@@ -38,7 +38,7 @@ function open() {
       storageError = msg;
       reject(new Error(msg));
     };
-    const timer = setTimeout(() => fail('保存領域を開けませんでした（時間切れ）'), 5000);
+    const timer = setTimeout(() => fail('保存領域を開けませんでした（時間切れ）'), 2500);
     const done = (v) => { if (settled) return; settled = true; clearTimeout(timer); resolve(v); };
 
     const req = indexedDB.open(NAME, VERSION);
