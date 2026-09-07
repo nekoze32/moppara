@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="description" content="もっぱら、食事管理だけ。写真か一言を送るだけで記録できるAIトレーナー。">
+<meta name="theme-color" content="#C2552F">
+<title>Moppara</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Moppara">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== 常時見える残量バー ===== -->
+<header id="statusbar" class="statusbar" role="button" tabindex="0" aria-label="今日の残量。タップで今日の画面へ">
+  <div class="sb-main">
+    <div class="sb-remain">
+      <span class="sb-num" id="sb-kcal">—</span><span class="sb-unit">kcal 残り</span>
+    </div>
+    <div class="sb-date" id="sb-date"></div>
+  </div>
+  <div class="sb-macros" id="sb-macros"></div>
+  <div class="sb-bar"><div class="sb-bar-fill" id="sb-bar-fill"></div></div>
+</header>
+
+<main id="main">
+
+  <!-- ===== チャット ===== -->
+  <section class="screen" id="screen-chat" data-screen="chat">
+    <div class="chat-log" id="chat-log"></div>
+    <div class="composer">
+      <div class="chips" id="chips"></div>
+      <div class="attach-preview" id="attach-preview" hidden>
+        <img id="attach-img" alt="送信する写真">
+        <button class="attach-x" id="attach-clear" aria-label="写真を外す">×</button>
+      </div>
+      <div class="composer-row">
+        <label class="icon-btn" for="photo-input" aria-label="写真を撮る・選ぶ">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        </label>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+        <textarea id="chat-input" rows="1" placeholder="食べたもの・体重・運動・相談"></textarea>
+        <button class="send-btn" id="send-btn" aria-label="送信">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4 3.4 10.2 14 12 3.4 13.8z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 今日 ===== -->
+  <section class="screen" id="screen-today" data-screen="today" hidden>
+    <div class="scroll" id="today-body"></div>
+  </section>
+
+  <!-- ===== 推移 ===== -->
+  <section class="screen" id="screen-trend" data-screen="trend" hidden>
+    <div class="scroll" id="trend-body"></div>
+  </section>
+
+  <!-- ===== 設定 ===== -->
+  <section class="screen" id="screen-settings" data-screen="settings" hidden>
+    <div class="scroll" id="settings-body"></div>
+  </section>
+
+</main>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tab is-on" data-go="chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>チャット</span></button>
+  <button class="tab" data-go="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>今日</span></button>
+  <button class="tab" data-go="trend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.5-5 3.5 3 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>推移</span></button>
+  <button class="tab" data-go="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>設定</span></button>
+</nav>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

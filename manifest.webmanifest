@@ -1,0 +1,18 @@
+{
+  "name": "Moppara — AI食事管理",
+  "short_name": "Moppara",
+  "description": "もっぱら、食事管理だけ。写真か一言を送るだけで記録できるAIトレーナー。",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF7F2",
+  "theme_color": "#C2552F",
+  "lang": "ja",
+  "categories": ["health", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
