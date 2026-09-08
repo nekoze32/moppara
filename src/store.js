@@ -24,6 +24,7 @@ export const state = {
   presets: [],
   storageError: null,
   restoredFromBackup: false,
+  lastRecord: null,      // {label,kcal,at} 記録した直後の一言に使う
   missing: [],   // 上限を出すのに足りない項目
   ready: false,  // 全部そろったか
 };
@@ -58,6 +59,11 @@ export async function saveSettings(patch) {
   await db.setKV('settings', state.settings);
   db.mirrorSettings(state.settings);
   await refresh();
+}
+
+/** 記録した直後に「何が入って、次に何ができるか」を返すための控え。 */
+export function noteRecord(label, kcal, p = 0) {
+  state.lastRecord = { label, kcal, p, at: Date.now() };
 }
 
 /** AIが会話から聞き取った項目だけを設定へ反映する。 */

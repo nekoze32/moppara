@@ -3,7 +3,7 @@
 
 import { $, el, fmt, r0, r1, hhmm, uid, toast, undoToast, sumItems, jpDate, addDays } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, targetDay, setViewDay, goToday, weightKg, recentMeals } from '../store.js';
+import { state, refresh, currentDay, targetDay, setViewDay, goToday, weightKg, recentMeals, noteRecord, remaining } from '../store.js';
 import { reserveSlot } from './chat.js';
 
 /** 過去日へ書くときは、その日の同じ時刻にする（時刻順の並びを崩さない）。 */
@@ -36,7 +36,7 @@ export function render() {
       el('div', {}, el('button', { class: 'btn sm primary', onclick: () => goTab('chat') }, 'チャットで答える'))));
   }
 
-  root.append(dateNav(), sectionMeals(), sectionWeight(), sectionActivity());
+  root.append(dateNav(), momentCard(), sectionMeals(), sectionWeight(), sectionActivity());
   if (state.presets.length) root.append(sectionPresets());
   root.append(el('div', { class: 'faint', style: 'padding:4px 0 8px' },
     '行をタップすると直せます。'));
@@ -45,6 +45,21 @@ export function render() {
 // ---------------------------------------------------------------- 献立
 
 const SLOTS = ['朝', '昼', '夜', '間食'];
+
+/** 記録した直後だけ出る。数字が減るだけで終わらせない。 */
+function momentCard() {
+  const r = state.lastRecord;
+  if (!r || !state.isToday || Date.now() - r.at > 10 * 60 * 1000) return document.createDocumentFragment();
+  const rem = remaining();
+  let next;
+  if (rem.kcal < 0) next = `今日は ${fmt(-rem.kcal)} kcal 超えました。明日で均せます。`;
+  else if (rem.kcal < 300) next = `残り ${fmt(rem.kcal)} kcal。軽めの一品で締めるところです。`;
+  else if (rem.p > 25 && r.p < 20) next = `残り ${fmt(rem.kcal)} kcal。たんぱく質があと ${rem.p}g、肉か魚を。`;
+  else next = `残り ${fmt(rem.kcal)} kcal。定食が入ります。`;
+  return el('div', { class: 'moment' },
+    el('div', { class: 'chk' }, '✓'),
+    el('div', { class: 'mt' }, `${r.label} を記録。`, el('b', {}, next)));
+}
 
 /** 前後の日へ。昨日の食べ忘れを翌朝入れる、が一番ありがちな場面。 */
 function dateNav() {
@@ -72,13 +87,16 @@ function sectionMeals() {
       }, openSlot === slot ? '×' : '＋')));
     if (openSlot === slot) box.append(addPanel(slot));
     for (const m of rows) box.append(editing === m.id ? mealEditor(m) : mealRow(m));
+    if (!rows.length && openSlot !== slot) {
+      const rem = remaining();
+      box.append(el('div', { class: 'slot-empty', onclick: () => { openSlot = slot; editing = null; render(); } },
+        el('span', {}, rem.kcal > 0 ? el('span', {}, 'まだ', el('b', {}, fmt(rem.kcal), ' kcal'), '入ります') : 'まだ記録なし'),
+        el('span', {}, '›')));
+    }
   }
 
   const all = sumItems(state.meals.flatMap((m) => m.items));
-  box.append(el('div', { class: 'meal sum' },
-    el('span', { class: 'm-slot' }, ''),
-    el('span', { class: 'm-name' }, '計'),
-    el('span', { class: 'm-kcal' }, fmt(all.kcal))));
+  box.append(el('div', { class: 'sumrow' }, el('span', {}, '計'), el('b', {}, fmt(all.kcal), ' kcal')));
   return box;
 }
 
@@ -101,6 +119,7 @@ function addPanel(slot) {
           const id = uid();
           await db.putMeal({ id, day: targetDay(), at: stampFor(targetDay()), slot, items: structuredClone(r.items), source: 'again' });
           openSlot = null;
+          noteRecord(r.label, sumItems(r.items).kcal, sumItems(r.items).p);
           await refresh();
           undoToast(`${r.label} を ${slot} に記録しました`, async () => { await db.delMeal(id); await refresh(); });
         },
@@ -130,6 +149,7 @@ function addPanel(slot) {
                       p: Number(pp.value) || 0, f: Number(ff.value) || 0, c: Number(cc.value) || 0 }],
           });
           openSlot = null;
+          noteRecord(nm.value.trim(), Math.round(kcal), Number(pp.value) || 0);
           await refresh();
           undoToast(`${nm.value.trim()} を ${slot} に記録しました`, async () => { await db.delMeal(id); await refresh(); });
         },
@@ -145,14 +165,15 @@ function addPanel(slot) {
 
 function mealRow(m) {
   const t = sumItems(m.items);
+  const ph = el('div', { class: `ph s-${m.slot}${m.thumb ? ' has' : ''}` });
+  if (m.thumb) ph.style.backgroundImage = `url(${m.thumb})`;
   return el('div', { class: 'meal', onclick: () => { editing = m.id; render(); } },
-    el('span', { class: 'm-slot' }, `${hhmm(m.at)}`),
-    el('span', { class: 'm-body' },
+    ph,
+    el('div', { class: 'm-body' },
+      el('div', { class: 'm-slot' }, `${hhmm(m.at)}${m.items.map((i) => i.amount).filter(Boolean).length ? '　' + m.items.map((i) => i.amount).filter(Boolean).join(' ／ ') : ''}`),
       el('div', { class: 'm-name' }, m.items.map((i) => i.name).join('・')),
-      el('div', { class: 'm-macro' },
-        [m.slot, m.items.map((i) => i.amount).filter(Boolean).join(' ／ '),
-         `P ${r1(t.p)} F ${r1(t.f)} C ${r1(t.c)}`].filter(Boolean).join('　'))),
-    el('span', { class: 'm-kcal' }, fmt(t.kcal)));
+      el('div', { class: 'm-kcal' }, fmt(t.kcal), el('small', {}, 'kcal')),
+      el('div', { class: 'm-macro' }, `P ${r1(t.p)}　F ${r1(t.f)}　C ${r1(t.c)}`)));
 }
 
 /** 行をタップすると開く。品目ごとのkcalを直すとPFCも比例で動く。 */

@@ -23,6 +23,7 @@ async function boot() {
 
   $$('#tabbar .tab').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go)));
   $('#statusbar').addEventListener('click', () => navigate('today'));
+  $('#fab').addEventListener('click', () => { if (current !== 'chat') navigate('chat'); $('#photo-input').click(); });
   $('#statusbar').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') navigate('today'); });
 
   onChange(() => {
@@ -63,6 +64,7 @@ async function boot() {
 function navigate(name) {
   current = name;
   document.body.classList.toggle('onboarding', name === 'welcome');
+  $('#fab').hidden = !(name === 'chat' || name === 'today');
   for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
   for (const b of $$('#tabbar .tab')) b.classList.toggle('is-on', b.dataset.go === name);
   if (name === 'welcome') welcome.render();
@@ -80,11 +82,10 @@ function paintStatusBar() {
     bar.classList.add('setup');
     setLabel('設定がまだです');
     $('#sb-date').textContent = jpDate(state.today);
-    $('#sb-bar').textContent = '';
+    $('#sb-detail').textContent = '';
     const m0 = $('#sb-macros');
     m0.textContent = '';
-    m0.append(el('span', { class: 'sb-setup' },
-      `あと ${state.missing.join('・')}。チャットで教えてください。`));
+    m0.append(el('div', { class: 'sb-setup' }, `あと ${state.missing.join('・')}。チャットで教えてください。`));
     return;
   }
   bar.classList.remove('setup');
@@ -97,39 +98,41 @@ function paintStatusBar() {
   bar.classList.toggle('tight', tight);
 
   setLabel(state.isToday ? (over ? '超過' : '残り') : (over ? `${jpDate(state.today)} の超過` : `${jpDate(state.today)} の残り`));
-  // 数字が変わったときだけ小さく動かす。無音で書き換わると気づけない。
+
+  // 数字が変わったときだけ小さく動かす
   const kcalEl = $('#sb-kcal');
   const next = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);
   if (kcalEl.textContent !== next) {
     kcalEl.textContent = next;
     kcalEl.classList.remove('changed');
-    void kcalEl.offsetWidth;          // アニメーションを鳴らし直す
+    void kcalEl.offsetWidth;
     kcalEl.classList.add('changed');
   }
   $('#sb-unit').textContent = 'kcal';
+
+  // リング：食べた割合
+  const C = 251.3;
+  const pct = clamp(rem.pct, 0, 1);
+  const ring = $('#sb-ring');
+  ring.setAttribute('stroke-dasharray', `${(C * pct).toFixed(1)} ${C}`);
+  ring.classList.toggle('over', over);
+  ring.classList.toggle('tight', tight);
+  $('#sb-pct').textContent = `${Math.round(rem.pct * 100)}%`;
+
+  // PFCは3枚の小さなタイル。幅はそれぞれの達成率
+  const t = state.targets || { p: 0, f: 0, c: 0 };
+  const m = $('#sb-macros');
+  m.textContent = '';
+  for (const [k, got, tgt, v] of [['p', state.eaten.p, t.p, rem.p], ['f', state.eaten.f, t.f, rem.f], ['c', state.eaten.c, t.c, rem.c]]) {
+    const w = clamp(tgt > 0 ? got / tgt : 0, 0, 1) * 100;
+    m.append(el('div', { class: `mac ${k}` },
+      el('i', {}, el('b', { style: `width:${w.toFixed(0)}%` })),
+      el('span', {}, k.toUpperCase(), el('em', {}, `${v}`))));
+  }
+
   $('#sb-date').textContent = state.isToday ? jpDate(state.today) : '過去の日を見ています';
   $('#sb-detail').textContent =
     `上限 ${fmt(b?.budget)} ／ 摂取 ${fmt(state.eaten.kcal)}` + (b?.exercise ? ` ／ 運動 +${fmt(b.exercise)}` : '');
-
-  // PFCは1本のレールに束ねる。摂取したぶんだけ色が伸びる。
-  // 幅はグラムでなく kcal 換算（P4/F9/C4）。でないと脂質1gと炭水化物1gが同じ幅になり、
-  // 見た目が炭水化物に偏る。カロリー基準なら帯の数字と話が合う。
-  const rail = $('#sb-bar');
-  rail.textContent = '';
-  const t = state.targets || { p: 0, f: 0, c: 0 };
-  const KC = { p: 4, f: 9, c: 4 };
-  const totalKcal = t.p * KC.p + t.f * KC.f + t.c * KC.c || 1;
-  for (const [k, got, tgt] of [['p', state.eaten.p, t.p], ['f', state.eaten.f, t.f], ['c', state.eaten.c, t.c]]) {
-    const share = ((tgt * KC[k]) / totalKcal) * 100;           // その栄養素が持つ幅
-    const fill = clamp(tgt > 0 ? got / tgt : 0, 0, 1) * share; // うち摂った分
-    rail.append(el('i', { class: k, style: `width:${fill.toFixed(1)}%` }));
-  }
-
-  const m = $('#sb-macros');
-  m.textContent = '';
-  for (const [label, v, cls] of [['P', rem.p, 'm-p'], ['F', rem.f, 'm-f'], ['C', rem.c, 'm-c']]) {
-    m.append(el('span', { class: cls }, el('em', {}), `${label} 残り `, el('b', {}, `${v}g`)));
-  }
 }
 
 // ---------------------------------------------------------------- ショートカット連携

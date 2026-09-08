@@ -3,7 +3,7 @@
 
 import { $, el, uid, toast, undoToast, shrinkImage, sumItems, fmt, r1 } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, targetDay, goToday, recentDays, recentMeals, hasKey, applySetup } from '../store.js';
+import { state, refresh, currentDay, targetDay, goToday, recentDays, recentMeals, hasKey, applySetup, noteRecord } from '../store.js';
 import { ask, AIError } from '../ai.js';
 import { contextBlock } from '../prompts.js';
 
@@ -147,6 +147,7 @@ async function logAgain(r) {
     id, day: targetDay(), at: stampFor(targetDay()),
     slot: slotNow(), items: structuredClone(r.items), source: 'again',
   });
+  noteRecord(r.label, sumItems(r.items).kcal, sumItems(r.items).p);
   await refresh();
   const t = sumItems(r.items);
   logEl.append(el('div', { class: 'msg sys' },
@@ -322,7 +323,15 @@ function proposeCard(row) {
   const items = meal.items.map((i) => ({ ...i, b: { kcal: i.kcal || 1, p: i.p, f: i.f, c: i.c } }));
   const card = el('div', { class: 'propose' });
 
-  const slot = el('select', { style: 'width:auto;padding:3px 7px;font-size:13px' },
+  // 写真があれば上いっぱいに。kcalは写真の上に載せる
+  const badge = el('b');
+  if (row.thumb) {
+    const pic = el('div', { class: 'pic' }, badge);
+    pic.style.backgroundImage = `url(${row.thumb})`;
+    card.append(pic);
+  }
+
+  const slot = el('select', { style: 'width:auto;padding:4px 8px;font-size:13px;border-radius:9px' },
     ...['朝', '昼', '夜', '間食'].map((s) => el('option', { value: s, selected: s === meal.slot }, s)));
 
   card.append(el('div', { class: 'p-head' },
@@ -333,36 +342,37 @@ function proposeCard(row) {
 
   const totalRow = el('div', { class: 'p-macros' });
   const recalc = () => {
-    const t = sumItems(items.filter((i) => !i.removed));   // 外した品目は数えない
+    const t = sumItems(items.filter((i) => !i.removed));
+    badge.textContent = `${fmt(t.kcal)} kcal`;
     totalRow.textContent = '';
     totalRow.append(el('b', {}, `${fmt(t.kcal)} kcal`), ` ／ P ${r1(t.p)}g　F ${r1(t.f)}g　C ${r1(t.c)}g`);
   };
 
-  const rows = el('div');
-  const drawRows = () => {
-    rows.textContent = '';
-    items.forEach((it, idx) => {
-      if (it.removed) return;
-      const inp = el('input', { type: 'number', inputmode: 'numeric', value: String(it.kcal), min: '0', step: '10' });
-      inp.addEventListener('input', () => { scaleTo(it, Number(inp.value) || 0); recalc(); });
-      rows.append(el('div', { class: 'p-item' },
-        el('div', { class: 'n' }, it.name, it.amount ? el('small', {}, it.amount) : null,
-          // 「半分残した」をkcal計算させない
-          el('div', { class: 'p-mul' },
-            ...[0.5, 1, 1.5, 2].map((m) => el('button', {
-              class: 'mul', onclick: () => { scaleTo(it, Math.round(it.b.kcal * m)); drawRows(); recalc(); },
-            }, `×${m}`)),
-            el('button', { class: 'mul del', onclick: () => { it.removed = true; drawRows(); recalc(); } }, '外す'))),
-        inp));
-      void idx;
-    });
-  };
   const scaleTo = (it, v) => {
     const k = Math.max(0, v) / (it.b.kcal || 1);
     it.kcal = Math.max(0, Math.round(v));
     it.p = Math.round(it.b.p * k * 10) / 10;
     it.f = Math.round(it.b.f * k * 10) / 10;
     it.c = Math.round(it.b.c * k * 10) / 10;
+  };
+
+  const rows = el('div', { class: 'p-body' });
+  const drawRows = () => {
+    rows.textContent = '';
+    for (const it of items) {
+      if (it.removed) continue;
+      // 量は指で刻む。1回で元の25%（半分残したなら2回）
+      const step = Math.max(10, Math.round(it.b.kcal * 0.25));
+      const inp = el('input', { type: 'number', inputmode: 'numeric', value: String(it.kcal), min: '0' });
+      inp.addEventListener('input', () => { scaleTo(it, Number(inp.value) || 0); recalc(); });
+      const dec = el('button', { onclick: () => { scaleTo(it, it.kcal - step); inp.value = String(it.kcal); recalc(); } }, '−');
+      const inc = el('button', { onclick: () => { scaleTo(it, it.kcal + step); inp.value = String(it.kcal); recalc(); } }, '＋');
+      rows.append(el('div', { class: 'p-item' },
+        el('div', { class: 'n' }, it.name, it.amount ? el('small', {}, it.amount) : null,
+          el('div', { class: 'p-mul' },
+            el('button', { class: 'mul del', onclick: () => { it.removed = true; drawRows(); recalc(); } }, '外す'))),
+        el('div', { class: 'stp' }, dec, inp, inc)));
+    }
   };
   drawRows();
   card.append(rows, totalRow);
@@ -388,6 +398,7 @@ function proposeCard(row) {
         });
         const saved = { ...row, status: 'saved', mealId, meal: { ...meal, slot: slot.value, items: kept } };
         await db.putChat(saved);
+        noteRecord(kept.map((i) => i.name).join('・'), sumItems(kept).kcal, sumItems(kept).p);
         await refresh();
         card.replaceWith(savedCard(saved));
         toast('記録しました');
@@ -401,6 +412,11 @@ function proposeCard(row) {
 function savedCard(row) {
   const t = sumItems(row.meal.items);
   const card = el('div', { class: 'propose done' });
+  if (row.thumb) {
+    const pic = el('div', { class: 'pic' }, el('b', {}, `${fmt(t.kcal)} kcal`));
+    pic.style.backgroundImage = `url(${row.thumb})`;
+    card.append(pic);
+  }
   card.append(el('div', { class: 'p-head' },
     el('span', { class: 'p-title' }, `記録済み　${row.meal.slot}`),
     el('span', { class: 'p-conf' }, `${fmt(t.kcal)} kcal`)));
