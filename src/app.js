@@ -97,7 +97,15 @@ function paintStatusBar() {
   bar.classList.toggle('tight', tight);
 
   setLabel(over ? 'こ え た ぶ ん' : 'の こ り');
-  $('#sb-kcal').textContent = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);
+  // 数字が変わったときだけ小さく動かす。無音で書き換わると気づけない。
+  const kcalEl = $('#sb-kcal');
+  const next = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);
+  if (kcalEl.textContent !== next) {
+    kcalEl.textContent = next;
+    kcalEl.classList.remove('changed');
+    void kcalEl.offsetWidth;          // アニメーションを鳴らし直す
+    kcalEl.classList.add('changed');
+  }
   $('#sb-unit').textContent = 'kcal';
   $('#sb-date').textContent = jpDate(state.today);
   $('#sb-detail').textContent =

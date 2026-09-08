@@ -69,18 +69,24 @@ function mealRow(m) {
 /** 行をタップすると開く。品目ごとのkcalを直すとPFCも比例で動く。 */
 function mealEditor(m) {
   const items = m.items.map((i) => ({ ...i, b: { kcal: i.kcal || 1, p: i.p, f: i.f, c: i.c } }));
-  const box = el('div', { class: 'card', style: 'background:var(--surface2);padding:12px;margin-bottom:14px;border-radius:3px' });
+  const box = el('div', { class: 'mealedit' });
 
-  const slot = el('select', { style: 'width:auto;padding:4px 8px;font-size:13px' },
+  const slot = el('select', { style: 'width:auto;padding:5px 9px;font-size:14px' },
     ...['朝', '昼', '夜', '間食'].map((x) => el('option', { value: x, selected: x === m.slot }, x)));
-  const total = el('b', { style: 'font-family:var(--num);font-variant-numeric:tabular-nums' });
-  const recalc = () => { total.textContent = `${fmt(sumItems(items).kcal)} kcal`; };
 
-  box.append(el('div', { class: 'row', style: 'margin-bottom:8px' },
-    el('span', { class: 'faint' }, `${hhmm(m.at)} の記録を直す`), slot));
+  box.append(el('div', { class: 'mhead' },
+    el('span', { class: 'faint' }, `${hhmm(m.at)} の記録`), slot));
+
+  const totalKcal = el('b');
+  const totalMacro = el('span', { class: 'faint' });
+  const recalc = () => {
+    const t = sumItems(items);
+    totalKcal.textContent = `${fmt(t.kcal)} kcal`;
+    totalMacro.textContent = `P ${r1(t.p)}　F ${r1(t.f)}　C ${r1(t.c)}`;
+  };
 
   for (const it of items) {
-    const inp = el('input', { type: 'number', inputmode: 'numeric', step: '10', value: String(it.kcal), style: 'text-align:right' });
+    const inp = el('input', { type: 'number', inputmode: 'numeric', step: '10', value: String(it.kcal) });
     inp.addEventListener('input', () => {
       const v = Math.max(0, Number(inp.value) || 0);
       const k = v / (it.b.kcal || 1);
@@ -90,15 +96,14 @@ function mealEditor(m) {
       it.c = Math.round(it.b.c * k * 10) / 10;
       recalc();
     });
-    box.append(el('div', { class: 'editline' },
-      el('span', { style: 'font-size:13px;grid-column:span 2' }, it.name, it.amount ? el('small', { class: 'faint' }, `　${it.amount}`) : null),
+    box.append(el('div', { class: 'mrow' },
+      el('span', { class: 'n' }, it.name, it.amount ? el('small', {}, it.amount) : null),
       inp));
   }
   recalc();
-  box.append(el('div', { class: 'row', style: 'padding:9px 0 12px;border-bottom:1px solid var(--line)' },
-    el('span', { class: 'faint' }, '合計'), total));
 
-  box.append(el('div', { style: 'display:flex;gap:8px;margin-top:12px' },
+  box.append(el('div', { class: 'mtot' }, totalMacro, totalKcal));
+  box.append(el('div', { class: 'macts' },
     el('button', { class: 'btn sm danger', onclick: () => removeMeal(m) }, '消す'),
     el('span', { style: 'flex:1' }),
     el('button', { class: 'btn sm', onclick: () => { editing = null; render(); } }, 'やめる'),

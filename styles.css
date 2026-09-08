@@ -1,13 +1,13 @@
 :root{
   /* 紙：灰緑を含んだ冷たい白。クリームではない */
   --bg:#F2F3F0; --surface:#FBFCFA; --surface2:#E8EAE5; --surface3:#DDE1DA;
-  --ink:#171A17; --ink-soft:#5A6159; --ink-faint:#8B938A;
+  --ink:#171A17; --ink-soft:#5A6159; --ink-faint:#686F67;
   --line:#D5DAD2; --line2:#C2C9BE;
   --accent:#1F5FA8;          /* 藍：収まっている・操作 */
   --accent-ink:#FFFFFF; --accent-soft:#E3EBF5;
   --ok:#1F5FA8; --ok-soft:#E3EBF5;
   --warn:#B87309; --warn-soft:#F7EEDD;
-  --danger:#C7402B;          /* 朱：超えたときだけ */
+  --danger:#BC3826;          /* 朱：超えたときだけ。小さい字にも使うので4.5:1を確保 */
   --danger-soft:#F7E3DF;
   --p:#1F5FA8; --f:#B87309; --c:#7A4E9E;
   --chart-1:#1F5FA8; --chart-2:#C7402B; --chart-ink:#8B938A;
@@ -22,7 +22,7 @@
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#14171A; --surface:#1C2124; --surface2:#252B2E; --surface3:#2E3538;
-    --ink:#E6EAE5; --ink-soft:#9AA39C; --ink-faint:#6E7871;
+    --ink:#E6EAE5; --ink-soft:#9AA39C; --ink-faint:#818B83;
     --line:#333A35; --line2:#414A44;
     --accent:#5590CE; --accent-ink:#0F1417; --accent-soft:#1B2833;
     --ok:#5590CE; --ok-soft:#1B2833;
@@ -35,7 +35,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#14171A; --surface:#1C2124; --surface2:#252B2E; --surface3:#2E3538;
-  --ink:#E6EAE5; --ink-soft:#9AA39C; --ink-faint:#6E7871;
+  --ink:#E6EAE5; --ink-soft:#9AA39C; --ink-faint:#818B83;
   --line:#333A35; --line2:#414A44;
   --accent:#5590CE; --accent-ink:#0F1417; --accent-soft:#1B2833;
   --ok:#5590CE; --ok-soft:#1B2833;
@@ -52,14 +52,14 @@ html,body{height:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
   font-family:var(--jp);
-  font-size:15px;line-height:1.72;
+  font-size:15.5px;line-height:1.75;
   font-feature-settings:"palt" 1;-webkit-font-smoothing:antialiased;
   display:flex;flex-direction:column;
   overscroll-behavior-y:none;
 }
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none}
-h2{font-family:var(--mincho);font-size:11px;font-weight:500;letter-spacing:.16em;color:var(--ink-faint);
+h2{font-family:var(--mincho);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--ink-soft);
    margin:0 0 2px;padding-bottom:7px;border-bottom:1px solid var(--line)}
 h3{font-size:14px;margin:0 0 8px;color:var(--ink-soft);font-weight:600}
 a{color:var(--accent)}
@@ -76,16 +76,16 @@ a{color:var(--accent)}
 .sb-num{font-family:var(--num);font-size:56px;font-weight:700;font-stretch:82%;
         letter-spacing:-.035em;line-height:1.04;font-variant-numeric:tabular-nums;color:var(--accent)}
 .sb-unit{font-size:12px;color:var(--ink-soft);font-weight:500}
-.sb-date{font-size:11px;color:var(--ink-faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sb-date{font-size:12px;color:var(--ink-faint);white-space:nowrap;font-variant-numeric:tabular-nums}
 .statusbar.over .sb-num{color:var(--danger)}
 .statusbar.tight .sb-num{color:var(--warn)}
-.sb-label{font-family:var(--mincho);font-size:11px;letter-spacing:.16em;color:var(--ink-faint)}
-.sb-detail{font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums;margin:1px 0 10px}
+.sb-label{font-family:var(--mincho);font-size:12px;letter-spacing:.1em;color:var(--ink-soft)}
+.sb-detail{font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;margin:1px 0 10px}
 /* PFCは3行に散らさず1本のレールに束ねる */
 .sb-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:var(--surface3);gap:2px;margin-bottom:6px}
 .sb-bar i{display:block;height:100%}
 .sb-bar i.p{background:var(--p)} .sb-bar i.f{background:var(--f)} .sb-bar i.c{background:var(--c)}
-.sb-macros{display:flex;gap:14px;font-size:10.5px;color:var(--ink-soft);
+.sb-macros{display:flex;gap:14px;font-size:11.5px;color:var(--ink-soft);
            font-variant-numeric:tabular-nums;padding-bottom:10px;flex-wrap:wrap}
 .sb-macros span{display:flex;align-items:center;gap:4px}
 .sb-macros em{width:7px;height:7px;border-radius:2px;font-style:normal;flex:0 0 auto}
@@ -111,7 +111,7 @@ a{color:var(--accent)}
   display:grid;grid-template-columns:repeat(4,1fr);
   background:var(--surface);border-top:1px solid var(--line);
 }
-.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink-faint);font-size:10.5px;height:var(--tab-h)}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink-soft);font-size:11px;height:var(--tab-h)}
 .tab svg{width:22px;height:22px}
 .tab.is-on{color:var(--ink);font-weight:700;box-shadow:inset 0 2px 0 var(--ink)}
 
@@ -119,7 +119,7 @@ a{color:var(--accent)}
 .card{background:transparent;border:none;border-radius:0;padding:0;margin:0 0 22px}
 .card.tight{background:var(--surface2);padding:11px 12px;border-radius:3px}
 .muted{color:var(--ink-soft)}
-.faint{color:var(--ink-faint);font-size:12.5px}
+.faint{color:var(--ink-faint);font-size:13px;line-height:1.7}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .stack{display:flex;flex-direction:column;gap:8px}
 .num{font-variant-numeric:tabular-nums}
@@ -133,7 +133,7 @@ a{color:var(--accent)}
 
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
 .field label{font-size:12.5px;color:var(--ink-soft);font-weight:600}
-.field .hint{font-size:11.5px;color:var(--ink-faint);line-height:1.5}
+.field .hint{font-size:12.5px;color:var(--ink-faint);line-height:1.65}
 input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
   width:100%;padding:8px 10px;border:1px solid var(--line2);border-radius:3px;background:var(--surface);
   font-size:16px; /* iOSの自動ズーム防止 */
@@ -164,11 +164,11 @@ textarea{resize:none}
 /* 少ないときは下に寄せる。上に溜めると画面の大半が空白になる。 */
 .chat-log{flex:1 1 auto;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;
           justify-content:flex-end;gap:9px;-webkit-overflow-scrolling:touch}
-.msg{max-width:84%;padding:9px 13px;white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.72}
+.msg{max-width:84%;padding:10px 14px;white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.78}
 .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:15px 15px 4px 15px}
 .msg.ai{align-self:flex-start;background:var(--surface2);border-radius:15px 15px 15px 4px}
-.msg.sys{align-self:center;background:transparent;color:var(--ink-faint);font-family:var(--mincho);
-         font-size:10.5px;letter-spacing:.08em;padding:2px 8px;text-align:center;max-width:94%}
+.msg.sys{align-self:center;background:transparent;color:var(--ink-soft);font-family:var(--mincho);
+         font-size:11.5px;letter-spacing:.04em;padding:2px 8px;text-align:center;max-width:94%}
 .msg.err{align-self:flex-start;background:var(--danger-soft);color:var(--danger);border-radius:3px;font-size:13px}
 .msg.err .btn{margin-top:8px;border-color:var(--danger);color:var(--danger)}
 .msg img{max-width:170px;border-radius:3px;display:block;margin-bottom:6px}
@@ -183,7 +183,7 @@ textarea{resize:none}
          border:1px solid var(--ink);border-radius:3px;padding:11px 12px;font-size:12.5px}
 .propose.done{border-color:var(--line2);opacity:.9}
 .propose .p-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
-                 font-family:var(--mincho);font-size:10.5px;letter-spacing:.14em;color:var(--ink-faint);
+                 font-family:var(--mincho);font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft);
                  border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px}
 .propose .p-title{font-family:var(--mincho);letter-spacing:.14em}
 .propose .p-conf{font-size:10.5px;color:var(--ink-faint)}
@@ -196,7 +196,7 @@ textarea{resize:none}
 .p-macros{display:flex;gap:10px;font-size:11px;color:var(--ink-soft);margin-top:6px;padding-top:6px;
           border-top:1px solid var(--ink);font-variant-numeric:tabular-nums}
 .p-macros b{font-family:var(--num);font-weight:700;color:var(--ink)}
-.p-assume{font-family:var(--mincho);font-size:10.5px;color:var(--ink-faint);margin-top:7px;line-height:1.6;letter-spacing:.04em}
+.p-assume{font-family:var(--mincho);font-size:11.5px;color:var(--ink-faint);margin-top:7px;line-height:1.6;letter-spacing:.04em}
 .p-actions{display:flex;gap:7px;margin-top:10px}
 .p-actions .btn{flex:1}
 
@@ -227,10 +227,10 @@ textarea{resize:none}
 .meal img{grid-row:span 1;width:36px;height:36px;object-fit:cover;border-radius:2px;align-self:center}
 .meal .m-body{min-width:0}
 .meal .m-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
-.meal .m-slot{font-family:var(--mincho);font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums;align-self:start;padding-top:2px}
+.meal .m-slot{font-family:var(--mincho);font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;align-self:start;padding-top:2px}
 .meal .m-kcal{font-family:var(--num);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.meal .m-name{font-size:13.5px;line-height:1.5}
-.meal .m-macro{font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums;margin-top:1px}
+.meal .m-name{font-size:14.5px;line-height:1.55}
+.meal .m-macro{font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;margin-top:1px}
 .meal .m-del{color:var(--ink-faint);font-size:17px;padding:0 3px;align-self:center}
 .meal.sum{border-bottom:2px solid var(--ink);border-top:1px solid var(--line2);cursor:default}
 .meal.sum .m-name{font-weight:700;font-size:12.5px}
@@ -239,23 +239,60 @@ textarea{resize:none}
 /* ---------- 登録済み／未入力 ---------- */
 .state{display:grid;grid-template-columns:40px 1fr auto;gap:11px;padding:12px 0;
        border-bottom:1px solid var(--line);align-items:center}
-.state .s-time{font-family:var(--mincho);font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.state .s-time{font-family:var(--mincho);font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
 .state .s-val{display:flex;align-items:baseline;gap:6px;min-width:0;flex-wrap:wrap}
 .state .s-val b{font-family:var(--num);font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.state .s-val span{font-size:11.5px;color:var(--ink-faint)}
+.state .s-val span{font-size:12.5px;color:var(--ink-faint)}
 .state.empty .s-val{color:var(--ink-soft);font-size:13px}
-.state .s-fix{font-size:11.5px;padding:5px 11px;border:1px solid var(--line2);border-radius:3px;
+.state .s-fix{font-size:12.5px;padding:5px 11px;border:1px solid var(--line2);border-radius:3px;
               background:transparent;color:var(--ink-soft);white-space:nowrap}
 .state.empty .s-fix{border-color:var(--ink);color:var(--ink);font-weight:700}
-.editline{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;padding:11px 0;border-bottom:1px solid var(--line);align-items:center}
-.editline.one{grid-template-columns:1fr auto}
-.editline .btns{display:flex;gap:6px}
+/* 入力欄とボタンを同じ行に押し込むと、375px幅で欄が潰れる */
+.editline{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:11px 0;border-bottom:1px solid var(--line);
+          align-items:center;animation:openrow .2s cubic-bezier(.2,.7,.3,1)}
+.editline.one{grid-template-columns:1fr}
+.editline .btns{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;padding-top:3px}
+@media (prefers-reduced-motion:reduce){.editline{animation:none}}
+
+/* 献立を直す欄。品名に幅を渡し、数字は固定幅に閉じ込める */
+.mealedit{background:var(--surface2);border-radius:3px;padding:12px;margin:0 0 16px;
+          animation:openrow .2s cubic-bezier(.2,.7,.3,1)}
+.mealedit .mrow{display:grid;grid-template-columns:minmax(0,1fr) 88px;gap:10px;align-items:center;
+                padding:9px 0;border-bottom:1px solid var(--line)}
+.mealedit .mrow .n{font-size:14px;line-height:1.45;min-width:0;overflow-wrap:anywhere}
+.mealedit .mrow .n small{display:block;color:var(--ink-faint);font-size:12px;margin-top:1px}
+.mealedit .mrow input{width:100%;text-align:right;font-family:var(--num);font-size:16px;
+                      font-variant-numeric:tabular-nums;padding:6px 8px}
+.mealedit .mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:9px}
+.mealedit .mtot{display:flex;align-items:baseline;justify-content:space-between;padding:10px 0 2px;
+                border-top:1px solid var(--ink);margin-top:2px}
+.mealedit .mtot b{font-family:var(--num);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.mealedit .macts{display:flex;gap:8px;align-items:center;margin-top:14px}
+
+/* ---------- 動き。事務的になりすぎないぶんだけ ---------- */
+@keyframes openrow{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes tick{0%{transform:translateY(4px);opacity:.35}100%{transform:none;opacity:1}}
+@keyframes risein{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes bubblein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.sb-num.changed{animation:tick .34s cubic-bezier(.2,.7,.3,1)}
+.sb-bar i{transition:width .4s cubic-bezier(.2,.7,.3,1)}
+.meal,.state{transition:background .16s ease}
+.meal:active,.state:active{background:var(--surface2)}
+.btn,.s-fix,.chip{transition:background .14s ease,border-color .14s ease,transform .1s ease}
+.btn:active,.s-fix:active,.chip:active{transform:scale(.97)}
+.msg{animation:bubblein .22s cubic-bezier(.2,.7,.3,1)}
+.propose{animation:openrow .24s cubic-bezier(.2,.7,.3,1)}
+.toast{animation:risein .2s cubic-bezier(.2,.7,.3,1)}
+@media (prefers-reduced-motion:reduce){
+  .mealedit,.msg,.propose,.toast,.sb-num.changed{animation:none}
+  .sb-bar i,.meal,.state,.btn,.s-fix,.chip{transition:none}
+}
 
 /* ---------- グラフ ---------- */
 .chart{width:100%;height:auto;display:block;overflow:visible}
 .chart .axis{stroke:var(--line);stroke-width:1}
 .chart .gridline{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3;opacity:.7}
-.chart .tick{font-size:9px;fill:var(--ink-faint)}
+.chart .tick{font-size:10px;fill:var(--ink-soft)}
 .chart .lineW{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
 .chart .trend{fill:none;stroke:var(--ink-faint);stroke-width:1.4;stroke-dasharray:4 3}
 .chart .dot{fill:var(--accent)}
@@ -306,7 +343,7 @@ pre{background:var(--surface2);padding:10px 12px;border-radius:9px;overflow-x:au
 .hero{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:4px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .hero .h{min-width:82px}
 .hero .hv{font-family:var(--num);font-size:26px;font-weight:700;font-stretch:88%;font-variant-numeric:tabular-nums;letter-spacing:-.025em;line-height:1.2}
-.hero .hl{font-size:11px;color:var(--ink-faint)}
+.hero .hl{font-size:12px;color:var(--ink-soft)}
 table.tbl{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
 table.tbl th,table.tbl td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 table.tbl th:first-child,table.tbl td:first-child{text-align:left}
