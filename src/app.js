@@ -78,7 +78,7 @@ function paintStatusBar() {
   if (!state.ready) {
     bar.classList.remove('over', 'tight');
     bar.classList.add('setup');
-    setLabel('は じ め に');
+    setLabel('設定がまだです');
     $('#sb-date').textContent = jpDate(state.today);
     $('#sb-bar').textContent = '';
     const m0 = $('#sb-macros');
@@ -96,7 +96,7 @@ function paintStatusBar() {
   bar.classList.toggle('over', over);
   bar.classList.toggle('tight', tight);
 
-  setLabel(over ? 'こ え た ぶ ん' : 'の こ り');
+  setLabel(over ? '超過' : '残り');
   // 数字が変わったときだけ小さく動かす。無音で書き換わると気づけない。
   const kcalEl = $('#sb-kcal');
   const next = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);

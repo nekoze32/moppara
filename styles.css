@@ -59,8 +59,10 @@ body{
 }
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none}
-h2{font-family:var(--mincho);font-size:13px;font-weight:500;letter-spacing:.08em;color:var(--ink-soft);
-   margin:0 0 2px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+h2{font-family:var(--mincho);font-size:13px;font-weight:500;letter-spacing:.14em;color:var(--ink);
+   background:var(--surface2);
+   margin:0 -14px 5px;          /* スクロール領域の余白を打ち消して端まで届かせる */
+   padding:8px 14px;border-bottom:none}
 h3{font-size:14px;margin:0 0 8px;color:var(--ink-soft);font-weight:600}
 a{color:var(--accent)}
 
@@ -116,7 +118,7 @@ a{color:var(--accent)}
 .tab.is-on{color:var(--ink);font-weight:700;box-shadow:inset 0 2px 0 var(--ink)}
 
 /* ---------- カード ---------- */
-.card{background:transparent;border:none;border-radius:0;padding:0;margin:0 0 22px}
+.card{background:transparent;border:none;border-radius:0;padding:0;margin:0 0 28px}
 .card.tight{background:var(--surface2);padding:11px 12px;border-radius:3px}
 .muted{color:var(--ink-soft)}
 .faint{color:var(--ink-faint);font-size:13px;line-height:1.7}

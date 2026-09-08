@@ -68,7 +68,7 @@ function groupAI() {
   const key = isA ? s.anthropicKey : s.geminiKey;
   const model = isA ? s.anthropicModel : s.geminiModel;
 
-  return group('ai', 'A I', [
+  return group('ai', 'AI', [
     PROVIDERS[s.provider].label,
     key ? `キー ${mask(key)}　／　${model}` : 'APIキーが未設定です',
   ], (body) => {
@@ -125,7 +125,7 @@ const mask = (k) => (k.length > 10 ? `${k.slice(0, 4)}••••${k.slice(-4)}
 function groupBody() {
   const p = state.settings.profile;
   const lv = ACTIVITY_LEVELS.find((l) => l.key === p.activity);
-  return group('body', 'か ら だ', [
+  return group('body', '体の情報', [
     [p.sex ? (p.sex === 'female' ? '女性' : '男性') : '性別 未設定',
      p.birthYear ? `${p.birthYear}年生まれ` : '生まれ年 未設定',
      p.heightCm ? `${r1(p.heightCm)}cm` : '身長 未設定'].join('　'),
@@ -158,7 +158,7 @@ function groupGoal() {
   const t = macroTargets(state.settings, b.budget, kg);
   const mode = { diet: '減量', maintain: '維持', bulk: '増量' }[g.mode] || '—';
 
-  return group('goal', 'も く ひ ょ う', [
+  return group('goal', '目標', [
     state.ready
       ? `${mode}　${g.targetWeightKg ? `${r1(g.targetWeightKg)}kg` : ''}${g.targetDate ? `（${g.targetDate}まで）` : ''}`
       : `${mode}　まだ計算できません`,
@@ -216,7 +216,7 @@ function groupGoal() {
 
 function groupMacro() {
   const m = state.settings.macro;
-  return group('macro', 'P F C の 決 め 方', [
+  return group('macro', 'PFCの決め方', [
     `たんぱく質 ${r1(m.proteinGPerKg)} g/目標体重kg　／　脂質 ${Math.round(m.fatPctOfKcal * 100)}%`,
     '炭水化物は残りぜんぶ',
   ], (body) => {
@@ -233,7 +233,7 @@ function groupMacro() {
 
 function groupOps() {
   const s = state.settings;
-  return group('ops', 'う ん よ う', [
+  return group('ops', '運用', [
     `運動を上限に足す：${s.addExerciseToBudget ? 'する' : 'しない'}　／　${s.dayCutoffHour}時までは前日扱い`,
     s.prefs?.trim() ? `好み・制限：${s.prefs.trim().slice(0, 34)}${s.prefs.trim().length > 34 ? '…' : ''}` : '好み・制限は未記入',
   ], (body) => {
@@ -280,7 +280,7 @@ function sectionHealth() {
 
 function sectionData() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'デ ー タ'));
+  box.append(el('h2', {}, 'データ'));
   box.append(el('div', { class: 'hint', style: 'margin:8px 0 10px' },
     '記録はこの端末の中だけにあります。ときどき書き出してください。'));
 
@@ -318,7 +318,7 @@ function sectionData() {
 
 function sectionView() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'が め ん'));
+  box.append(el('h2', {}, '画面'));
   const sel = el('select', {},
     el('option', { value: 'auto' }, 'OSに合わせる'),
     el('option', { value: 'light' }, 'ライト'),

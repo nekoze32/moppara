@@ -33,7 +33,7 @@ export function render() {
 
 function sectionMeals() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'き ょ う の 献 立'));
+  box.append(el('h2', {}, '今日の献立'));
 
   if (!state.meals.length) {
     box.append(el('div', { class: 'state empty' },
@@ -69,10 +69,26 @@ function mealRow(m) {
 /** 行をタップすると開く。品目ごとのkcalを直すとPFCも比例で動く。 */
 function mealEditor(m) {
   const items = m.items.map((i) => ({ ...i, b: { kcal: i.kcal || 1, p: i.p, f: i.f, c: i.c } }));
+  let dirty = false;
   const box = el('div', { class: 'mealedit' });
+
+  const save = async () => {
+    await db.putMeal({ ...m, slot: slot.value, items: items.map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c })) });
+    editing = null;
+    await refresh();
+    toast('直しました');
+  };
+
+  // 入力欄・ボタン以外を叩いたら「閉じたい」と受け取る。
+  // 変えた内容は捨てずに保存してから閉じる（「やめる」は捨てる側の道として残す）。
+  box.addEventListener('click', (e) => {
+    if (e.target.closest('input, select, button, textarea, label, a')) return;
+    if (dirty) save(); else { editing = null; render(); }
+  });
 
   const slot = el('select', { style: 'width:auto;padding:5px 9px;font-size:14px' },
     ...['朝', '昼', '夜', '間食'].map((x) => el('option', { value: x, selected: x === m.slot }, x)));
+  slot.addEventListener('change', () => { dirty = true; });
 
   box.append(el('div', { class: 'mhead' },
     el('span', { class: 'faint' }, `${hhmm(m.at)} の記録`), slot));
@@ -88,6 +104,7 @@ function mealEditor(m) {
   for (const it of items) {
     const inp = el('input', { type: 'number', inputmode: 'numeric', step: '10', value: String(it.kcal) });
     inp.addEventListener('input', () => {
+      dirty = true;
       const v = Math.max(0, Number(inp.value) || 0);
       const k = v / (it.b.kcal || 1);
       it.kcal = v;
@@ -107,15 +124,9 @@ function mealEditor(m) {
     el('button', { class: 'btn sm danger', onclick: () => removeMeal(m) }, '消す'),
     el('span', { style: 'flex:1' }),
     el('button', { class: 'btn sm', onclick: () => { editing = null; render(); } }, 'やめる'),
-    el('button', {
-      class: 'btn sm primary',
-      onclick: async () => {
-        await db.putMeal({ ...m, slot: slot.value, items: items.map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c })) });
-        editing = null;
-        await refresh();
-        toast('直しました');
-      },
-    }, '保存')));
+    el('button', { class: 'btn sm primary', onclick: save }, '保存')));
+  box.append(el('div', { class: 'faint', style: 'font-size:11.5px;padding-top:9px' },
+    '欄の外を押しても閉じます（直した分は残ります）'));
   return box;
 }
 
@@ -130,7 +141,7 @@ async function removeMeal(m) {
 
 function sectionWeight() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'た い じ ゅ う'));
+  box.append(el('h2', {}, '体重'));
   const w = state.weight;
 
   if (editing === 'weight' || !w) {
@@ -180,7 +191,7 @@ function sectionWeight() {
 
 function sectionActivity() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'う ご い た ぶ ん'));
+  box.append(el('h2', {}, '運動'));
 
   for (const a of state.activities) {
     box.append(el('div', { class: 'state' },
@@ -232,7 +243,7 @@ function sectionActivity() {
 
 function sectionPresets() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, 'い つ も の'));
+  box.append(el('h2', {}, 'いつもの'));
   for (const p of state.presets) {
     const t = sumItems(p.items);
     box.append(el('div', { class: 'state' },
