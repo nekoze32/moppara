@@ -4,9 +4,13 @@
 import { $, el, fmt, r0, r1, hhmm, uid, toast, undoToast, sumItems, jpDate } from '../util.js';
 import * as db from '../db.js';
 import { state, refresh, currentDay, weightKg } from '../store.js';
+import { reserveSlot } from './chat.js';
 
 let root, goTab = () => {};
 let editing = null;   // 'weight' | 'activity' | meal.id
+
+/** チャットの記録済みカードの「直す」から呼ばれる。 */
+export function openMeal(id) { editing = id; goTab('today'); render(); }
 
 export function mount({ navigate }) {
   root = $('#today-body');
@@ -31,26 +35,31 @@ export function render() {
 
 // ---------------------------------------------------------------- 献立
 
+const SLOTS = ['朝', '昼', '夜', '間食'];
+
 function sectionMeals() {
   const box = el('div', { class: 'card' });
   box.append(el('h2', {}, '今日の献立'));
 
-  if (!state.meals.length) {
-    box.append(el('div', { class: 'state empty' },
-      el('span', { class: 's-time' }, '— —'),
-      el('span', { class: 's-val' }, 'まだ何も食べていない'),
-      el('button', { class: 's-fix', onclick: () => goTab('chat') }, '記録する')));
-    return box;
+  // 区分ごとに並べ、空でも「＋」を出す。1件入れたら追加口が消えるのは不便。
+  for (const slot of SLOTS) {
+    const rows = state.meals.filter((m) => m.slot === slot);
+    const t = sumItems(rows.flatMap((m) => m.items));
+    box.append(el('div', { class: 'slot' },
+      el('span', { class: 'slot-name' }, slot),
+      el('span', { class: 'slot-kcal' }, rows.length ? fmt(t.kcal) : '—'),
+      el('button', {
+        class: 'slot-add',
+        onclick: () => { reserveSlot(slot); goTab('chat'); },
+      }, '＋')));
+    for (const m of rows) box.append(editing === m.id ? mealEditor(m) : mealRow(m));
   }
 
-  for (const m of state.meals) {
-    box.append(editing === m.id ? mealEditor(m) : mealRow(m));
-  }
-  const t = sumItems(state.meals.flatMap((m) => m.items));
+  const all = sumItems(state.meals.flatMap((m) => m.items));
   box.append(el('div', { class: 'meal sum' },
     el('span', { class: 'm-slot' }, ''),
     el('span', { class: 'm-name' }, '計'),
-    el('span', { class: 'm-kcal' }, fmt(t.kcal))));
+    el('span', { class: 'm-kcal' }, fmt(all.kcal))));
   return box;
 }
 

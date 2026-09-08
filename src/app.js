@@ -16,7 +16,7 @@ async function boot() {
   await initStore();
 
   welcome.mount({ navigate });
-  chat.mount({ navigate });
+  chat.mount({ navigate, editMeal: (id) => today.openMeal(id) });
   today.mount({ navigate });
   trend.mount();
   settings.mount();

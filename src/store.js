@@ -121,6 +121,33 @@ export function hasKey(s = state.settings) {
   return s.provider === 'anthropic' ? !!s.anthropicKey : !!s.geminiKey;
 }
 
+/**
+ * 過去に食べた献立を、よく食べる順＋直近順でまとめる。
+ * 同じものを食べたときにAIを呼ばないための一覧。
+ */
+export async function recentMeals(limit = 10) {
+  const meals = (await db.allMeals()).slice(-300);
+  const map = new Map();
+  for (const m of meals) {
+    if (!m.items?.length) continue;
+    const key = m.items.map((i) => i.name).join('｜');
+    const prev = map.get(key);
+    map.set(key, {
+      key,
+      label: m.items.map((i) => i.name).join('・'),
+      items: m.items,                    // 直近に記録した内容で上書きする
+      count: (prev?.count || 0) + 1,
+      lastAt: m.at,
+      lastDay: m.day,
+    });
+  }
+  const today = state.today;
+  return [...map.values()]
+    .filter((r) => r.lastDay !== today || r.count > 1)   // 今日すでに1回だけのものは出さない
+    .sort((a, b) => (b.count - a.count) || String(b.lastAt).localeCompare(String(a.lastAt)))
+    .slice(0, limit);
+}
+
 // 直近n日ぶんの日別サマリ（推移タブとAIへの文脈で使う）
 export async function recentDays(n = 14) {
   const meals = await db.allMeals();

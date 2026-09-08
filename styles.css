@@ -188,7 +188,7 @@ textarea{resize:none}
                  font-family:var(--mincho);font-size:11.5px;letter-spacing:.06em;color:var(--ink-soft);
                  border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px}
 .propose .p-title{font-family:var(--mincho);letter-spacing:.14em}
-.propose .p-conf{font-size:10.5px;color:var(--ink-faint)}
+.propose .p-conf{font-size:11px;color:var(--ink-faint);white-space:nowrap;flex:0 0 auto}
 .propose .p-conf.low{color:var(--warn)}
 .p-item{display:grid;grid-template-columns:1fr 62px;gap:8px;align-items:center;padding:4px 0}
 .p-item .n{font-size:12.5px;line-height:1.45}
@@ -215,8 +215,13 @@ textarea{resize:none}
 .send-btn:disabled{opacity:.35}
 .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;padding:5px 10px;border-radius:3px;background:transparent;border:1px solid var(--line2);
+.chip{flex:0 0 auto;padding:6px 11px;border-radius:3px;background:transparent;border:1px solid var(--line2);
       font-size:12px;white-space:nowrap;color:var(--ink-soft)}
+/* 履歴からの再登録。押せばそのまま入るので、他のチップより前に出す */
+.chip.again{border-color:var(--ink);color:var(--ink);font-variant-numeric:tabular-nums}
+.chip.again b{font-weight:700;margin-right:3px}
+.chips-label{flex:0 0 auto;align-self:center;font-family:var(--mincho);font-size:11px;
+             color:var(--ink-faint);letter-spacing:.08em;padding-right:2px}
 .attach-preview{position:relative;display:inline-block;margin-bottom:8px}
 .attach-preview img{max-height:78px;border-radius:3px;display:block}
 .attach-x{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;
@@ -237,6 +242,21 @@ textarea{resize:none}
 .meal.sum{border-bottom:2px solid var(--ink);border-top:1px solid var(--line2);cursor:default}
 .meal.sum .m-name{font-weight:700;font-size:12.5px}
 .meal.sum .m-kcal{font-size:17px;font-weight:700}
+
+/* ---------- 食事区分の行 ---------- */
+.slot{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
+      padding:9px 0 7px;border-bottom:1px solid var(--line)}
+.slot-name{font-family:var(--mincho);font-size:13px;letter-spacing:.1em;color:var(--ink)}
+.slot-kcal{font-family:var(--num);font-size:13px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.slot-add{width:30px;height:30px;border:1px solid var(--line2);border-radius:3px;
+          color:var(--ink);font-size:16px;line-height:1;display:grid;place-items:center}
+
+/* 伝票の中の量の倍率 */
+.p-mul{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.p-mul .mul{font:inherit;font-size:11px;padding:3px 7px;border:1px solid var(--line2);
+            border-radius:3px;background:transparent;color:var(--ink-soft)}
+.p-mul .mul.del{color:var(--danger);border-color:var(--danger)}
+.p-saved{font-size:13px;line-height:1.55;padding:2px 0 6px}
 
 /* ---------- 登録済み／未入力 ---------- */
 .state{display:grid;grid-template-columns:40px 1fr auto;gap:11px;padding:12px 0;
