@@ -26,7 +26,7 @@ export function render() {
     },
       el('div', { class: 'w-card-t' }, key === 'gemini' ? '無料ではじめる' : '精度で選ぶ'),
       el('div', { class: 'w-card-n' }, p.label),
-      el('div', { class: 'w-card-p' }, key === 'gemini' ? '0円 / 1日1,500回まで' : '写真1枚 約0.6円'));
+      el('div', { class: 'w-card-p' }, key === 'gemini' ? '0円（モデルごとに回数上限あり）' : '写真1枚 約0.6円'));
     choice.append(card);
   }
   const p = PROVIDERS[picked];
