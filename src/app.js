@@ -84,7 +84,9 @@ function bindCollapse() {
     const cs = getComputedStyle(bar);
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
     const heroH = hero.offsetHeight + foot.offsetHeight;
-    if (heroH <= 0) return;
+    // 画面の4割より高い帯はあり得ない（本番の別環境で 857px を返した例あり）。
+    // 誤った値で中身を画面外へ押し出すより、前回の正しい値を使い続けるほうが安全。
+    if (heroH <= 0 || heroH > innerHeight * 0.4) return;
     bar.style.setProperty('--hero-h', `${heroH}px`);
     document.documentElement.style.setProperty('--bar-h', `${Math.round(pad + heroH)}px`);
     range = Math.max(60, heroH - 44);     // 畳み切ったときに1行（約44px）が残る
