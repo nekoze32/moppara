@@ -96,9 +96,16 @@ const num = (v) => {
 /** モデルの返しがどう崩れていても、アプリが扱える形に均す。 */
 export function coerce(raw) {
   const o = raw && typeof raw === 'object' ? raw : {};
-  const out = { reply: String(o.reply || '').trim(), meal: null, weight: null, activity: null, setup: null };
+  const INTENTS = ['record', 'consult', 'weight', 'activity', 'setup', 'other'];
+  const out = {
+    reply: String(o.reply || '').trim(), meal: null, weight: null, activity: null, setup: null,
+    intent: INTENTS.includes(o.intent) ? o.intent : null,
+  };
 
   const m = o.meal;
+  if (m && typeof m === 'object' && !(Array.isArray(m.items) && m.items.length)) {
+    console.warn('[moppara] meal は返ったが items が空か配列でない', m);   // 落とした理由を残す
+  }
   if (m && typeof m === 'object' && Array.isArray(m.items) && m.items.length) {
     const items = m.items
       .filter((i) => i && (i.name || i.kcal))

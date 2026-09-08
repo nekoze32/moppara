@@ -261,6 +261,16 @@ async function deliver(text, img, thumb = null) {
       await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'assistant', text: msg });
     }
 
+    // AIが文章で「記録した」と言いながら meal を返さないことがある。文章だけでは何も起きないので、
+    // 記録のつもりだった（intent=record／写真つき／返事に「記録」）のに伝票が無ければ、その場で言う。
+    const claimed = /記録し/.test(out.reply || '');
+    if (!out.meal && (out.intent === 'record' || claimed || (img && !out.weight && !out.activity && !out.setup))) {
+      logEl.append(el('div', { class: 'msg err' },
+        'まだ記録していません。AIが中身（品名とカロリー）を返してこなかったためです。',
+        el('div', { class: 'faint', style: 'margin-top:6px' },
+          '品名を一言（例：「ザバス ミルクプロテイン 1本」）で送ると伝票が出ます。数値が分かるなら、今日タブの区分の＋から「数値で入れる」でも登録できます。')));
+    }
+
     if (out.meal) {
       // 「＋ 夜」から来たなら、その区分を優先する（AIは時刻から推測しているだけ）
       const reserved = takeSlot();
@@ -296,7 +306,7 @@ function setBusy(b) { busy = b; sendBtn.disabled = b; }
 function userBubble(text, thumb) {
   const n = el('div', { class: 'msg user' });
   if (thumb) n.append(el('img', { src: thumb, alt: '送った写真' }));
-  if (text) n.append(document.createTextNode(text));
+  if (text && !(thumb && text === '（写真）')) n.append(document.createTextNode(text));   // 写真だけなら文字は要らない
   return n;
 }
 

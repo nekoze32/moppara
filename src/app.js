@@ -94,7 +94,7 @@ function bindCollapse() {
   };
   const paint = () => {
     const c = Math.max(scrollC, focusC);
-    bar.style.setProperty('--c', c.toFixed(3));
+    bar.style.setProperty('--fold', c.toFixed(3));
     bar.classList.toggle('pill-active', c > 0.6);
   };
 
@@ -165,6 +165,7 @@ function paintStatusBar() {
     m0.append(el('div', { class: 'sb-setup' }, `あと ${state.missing.join('・')}。チャットで教えてください。`));
     $('#mini-label').textContent = '設定がまだです';
     $('#mini-date').textContent = jpDate(state.today);
+    $('#mini-pfc').textContent = '';
     return;
   }
   bar.classList.remove('setup');
@@ -191,6 +192,12 @@ function paintStatusBar() {
   $('#mini-kcal').textContent = next;
   $('#mini-label').textContent = $('#sb-label').textContent;
   $('#mini-date').textContent = state.isToday ? jpDate(state.today) : '過去の日';
+  // 縮めた帯の右側は空くので、PFCの残りを並べる
+  const mp = $('#mini-pfc');
+  mp.textContent = '';
+  for (const [k, v] of [['p', rem.p], ['f', rem.f], ['c', rem.c]]) {
+    mp.append(el('span', { class: k }, el('em', {}), k.toUpperCase(), el('b', {}, `${v}`)));
+  }
 
   // リング：食べた割合
   const C = 251.3;
