@@ -10,7 +10,9 @@ const emit = () => listeners.forEach((f) => f(state));
 
 export const state = {
   settings: structuredClone(DEFAULT_SETTINGS),
-  today: ymd(),
+  today: ymd(),          // 画面が見ている日（過去に移動できる）
+  realToday: ymd(),      // 実際の今日
+  isToday: true,
   meals: [],
   activities: [],
   weight: null,       // {day, kg, fatPct}
@@ -75,12 +77,28 @@ export async function applySetup(setup) {
   return got;
 }
 
+/** 実際の今日（深夜のくり下げを考慮）。 */
 export function currentDay() {
   return mealDay(new Date(), state.settings.dayCutoffHour);
 }
 
+/** いま書き込む先の日。画面が過去日を見ているならそちら。 */
+export function targetDay() {
+  return state.today;
+}
+
+let pinnedDay = null;   // 過去日を見ているときだけ入る
+
+export async function setViewDay(day) {
+  pinnedDay = day === currentDay() ? null : day;
+  await refresh();
+}
+export async function goToday() { await setViewDay(currentDay()); }
+
 export async function refresh() {
-  state.today = currentDay();
+  state.realToday = currentDay();
+  state.today = pinnedDay || state.realToday;
+  state.isToday = state.today === state.realToday;
   try {
     state.meals = await db.mealsOf(state.today);
     state.activities = await db.activitiesOf(state.today);
@@ -141,7 +159,7 @@ export async function recentMeals(limit = 10) {
       lastDay: m.day,
     });
   }
-  const today = state.today;
+  const today = state.realToday;
   return [...map.values()]
     .filter((r) => r.lastDay !== today || r.count > 1)   // 今日すでに1回だけのものは出さない
     .sort((a, b) => (b.count - a.count) || String(b.lastAt).localeCompare(String(a.lastAt)))
@@ -156,7 +174,7 @@ export async function recentDays(n = 14) {
   const wmap = new Map(weights.map((w) => [w.day, w]));
   const out = [];
   for (let i = n - 1; i >= 0; i--) {
-    const day = addDays(state.today, -i);
+    const day = addDays(state.realToday, -i);
     const dm = meals.filter((m) => m.day === day);
     const s = sumMeals(dm);
     out.push({

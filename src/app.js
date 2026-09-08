@@ -48,9 +48,9 @@ async function boot() {
   window.addEventListener('hashchange', handleHash);
 
   // 日付が変わったら今日を切り替える
-  setInterval(() => { if (state.today !== currentDay()) refresh(); }, 60_000);
+  setInterval(() => { if (state.realToday !== currentDay()) refresh(); }, 60_000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && state.today !== currentDay()) refresh();
+    if (!document.hidden && state.realToday !== currentDay()) refresh();
   });
 
   if (!hasKey()) navigate('welcome');
@@ -96,7 +96,7 @@ function paintStatusBar() {
   bar.classList.toggle('over', over);
   bar.classList.toggle('tight', tight);
 
-  setLabel(over ? '超過' : '残り');
+  setLabel(state.isToday ? (over ? '超過' : '残り') : (over ? `${jpDate(state.today)} の超過` : `${jpDate(state.today)} の残り`));
   // 数字が変わったときだけ小さく動かす。無音で書き換わると気づけない。
   const kcalEl = $('#sb-kcal');
   const next = over ? `+${fmt(-rem.kcal)}` : fmt(rem.kcal);
@@ -107,7 +107,7 @@ function paintStatusBar() {
     kcalEl.classList.add('changed');
   }
   $('#sb-unit').textContent = 'kcal';
-  $('#sb-date').textContent = jpDate(state.today);
+  $('#sb-date').textContent = state.isToday ? jpDate(state.today) : '過去の日を見ています';
   $('#sb-detail').textContent =
     `上限 ${fmt(b?.budget)} ／ 摂取 ${fmt(state.eaten.kcal)}` + (b?.exercise ? ` ／ 運動 +${fmt(b.exercise)}` : '');
 

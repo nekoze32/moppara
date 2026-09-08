@@ -3,7 +3,7 @@
 
 import { $, el, uid, toast, undoToast, shrinkImage, sumItems, fmt, r1 } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, recentDays, recentMeals, hasKey, applySetup } from '../store.js';
+import { state, refresh, currentDay, targetDay, goToday, recentDays, recentMeals, hasKey, applySetup } from '../store.js';
 import { ask, AIError } from '../ai.js';
 import { contextBlock } from '../prompts.js';
 
@@ -37,9 +37,24 @@ export function mount({ navigate, editMeal }) {
 
   restore();
   renderChips();
+  paintDayNotice();
 }
 
-export function onDataChanged() { renderChips(); }
+export function onDataChanged() { renderChips(); paintDayNotice(); }
+
+/** 過去日を見ているときだけ、書き込み先を頭に出す。黙って昨日に入るのは事故のもと。 */
+function paintDayNotice() {
+  let n = $('#chat-daynotice');
+  if (state.isToday) { n?.remove(); return; }
+  if (!n) {
+    n = el('div', { class: 'daynotice', id: 'chat-daynotice' });
+    logEl.parentElement.insertBefore(n, logEl);
+  }
+  n.textContent = '';
+  n.append(`${jpDateFull(state.today)} に記録します`,
+    el('button', { class: 'btn sm', style: 'margin-left:10px', onclick: () => goToday() }, '今日に戻る'));
+}
+const jpDateFull = (d) => { const [y, m, dd] = d.split('-').map(Number); return `${m}/${dd}`; };
 
 // ---------------------------------------------------------------- 履歴
 
@@ -129,7 +144,7 @@ const shorten = (s, n = 14) => (s.length > n ? s.slice(0, n) + '…' : s);
 async function logAgain(r) {
   const id = uid();
   await db.putMeal({
-    id, day: currentDay(), at: new Date().toISOString(),
+    id, day: targetDay(), at: stampFor(targetDay()),
     slot: slotNow(), items: structuredClone(r.items), source: 'again',
   });
   await refresh();
@@ -147,6 +162,14 @@ export function reserveSlot(slot) { pendingSlot = slot; }
 function takeSlot() { const s = pendingSlot; pendingSlot = null; return s; }
 const slotByHour = () => { const h = new Date().getHours(); return h < 10 ? '朝' : h < 15 ? '昼' : h < 22 ? '夜' : '間食'; };
 export function slotNow() { return takeSlot() || slotByHour(); }
+
+/** 過去日へ書くときは、その日の同じ時刻にする（時刻順の並びを崩さない）。 */
+function stampFor(day) {
+  const now = new Date();
+  if (day === currentDay()) return now.toISOString();
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+}
 
 // ---------------------------------------------------------------- 送信
 
@@ -208,11 +231,11 @@ async function deliver(text, img, thumb = null) {
     const got = await applySetup(out.setup);
     if (got.length) side.push(`${got.join('・')}を登録`);
     if (out.weight) {
-      await db.putWeight({ day: currentDay(), kg: out.weight.kg, fatPct: out.weight.fatPct, at });
+      await db.putWeight({ day: targetDay(), kg: out.weight.kg, fatPct: out.weight.fatPct, at: stampFor(targetDay()) });
       side.push(`体重 ${out.weight.kg}kg を記録`);
     }
     if (out.activity) {
-      await db.putActivity({ id: uid(), day: currentDay(), at, name: out.activity.name, kcal: out.activity.kcal, minutes: out.activity.minutes });
+      await db.putActivity({ id: uid(), day: targetDay(), at: stampFor(targetDay()), name: out.activity.name, kcal: out.activity.kcal, minutes: out.activity.minutes });
       side.push(`${out.activity.name} ${fmt(out.activity.kcal)}kcal を記録`);
     }
     if (side.length || out.weight || out.activity || got.length) await refresh();
@@ -360,7 +383,7 @@ function proposeCard(row) {
         if (!kept.length) { toast('品目が残っていません'); return; }
         const mealId = uid();
         await db.putMeal({
-          id: mealId, day: currentDay(), at: new Date().toISOString(),
+          id: mealId, day: targetDay(), at: stampFor(targetDay()),
           slot: slot.value, items: kept, thumb: row.thumb || null, source: row.thumb ? 'photo' : 'text',
         });
         const saved = { ...row, status: 'saved', mealId, meal: { ...meal, slot: slot.value, items: kept } };

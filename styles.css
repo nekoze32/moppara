@@ -258,6 +258,24 @@ textarea{resize:none}
 .p-mul .mul.del{color:var(--danger);border-color:var(--danger)}
 .p-saved{font-size:13px;line-height:1.55;padding:2px 0 6px}
 
+/* ---------- 日付の行 ---------- */
+.datenav{display:flex;align-items:center;gap:8px;margin:-4px 0 14px}
+.dn-btn{width:34px;height:34px;border:1px solid var(--line2);border-radius:3px;font-size:20px;line-height:1;color:var(--ink);display:grid;place-items:center}
+.dn-btn:disabled{opacity:.3}
+.dn-day{font-family:var(--num);font-size:15px;font-weight:700;flex:1;text-align:center;font-variant-numeric:tabular-nums}
+
+/* ＋を押すと出る板 */
+.slot-add.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.addpanel{background:var(--surface2);border-radius:3px;padding:12px;margin:8px 0 10px;animation:openrow .2s cubic-bezier(.2,.7,.3,1)}
+.ap-label{font-family:var(--mincho);font-size:11.5px;letter-spacing:.08em;color:var(--ink-soft);margin:10px 0 6px}
+.ap-label:first-child{margin-top:0}
+.ap-recent{display:flex;flex-wrap:wrap;gap:6px}
+.ap-grid{display:grid;grid-template-columns:1fr 92px;gap:8px}
+.ap-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.daynotice{flex:0 0 auto;background:var(--warn-soft);color:var(--warn);padding:8px 14px;font-size:13px;
+           display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.addpanel{animation:none}}
+
 /* ---------- 登録済み／未入力 ---------- */
 .state{display:grid;grid-template-columns:40px 1fr auto;gap:11px;padding:12px 0;
        border-bottom:1px solid var(--line);align-items:center}

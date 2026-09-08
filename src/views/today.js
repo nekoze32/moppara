@@ -1,13 +1,22 @@
 // 今日タブ＝帳面。読むのが主で、書くのは「登録済み／修正」の形に揃える。
 // 入力欄を出しっぱなしにしない（何度も登録できてしまうため）。
 
-import { $, el, fmt, r0, r1, hhmm, uid, toast, undoToast, sumItems, jpDate } from '../util.js';
+import { $, el, fmt, r0, r1, hhmm, uid, toast, undoToast, sumItems, jpDate, addDays } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, weightKg } from '../store.js';
+import { state, refresh, currentDay, targetDay, setViewDay, goToday, weightKg, recentMeals } from '../store.js';
 import { reserveSlot } from './chat.js';
+
+/** 過去日へ書くときは、その日の同じ時刻にする（時刻順の並びを崩さない）。 */
+function stampFor(day) {
+  const now = new Date();
+  if (day === currentDay()) return now.toISOString();
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+}
 
 let root, goTab = () => {};
 let editing = null;   // 'weight' | 'activity' | meal.id
+let openSlot = null;  // ＋を押して開いている区分
 
 /** チャットの記録済みカードの「直す」から呼ばれる。 */
 export function openMeal(id) { editing = id; goTab('today'); render(); }
@@ -27,21 +36,30 @@ export function render() {
       el('div', {}, el('button', { class: 'btn sm primary', onclick: () => goTab('chat') }, 'チャットで答える'))));
   }
 
-  root.append(sectionMeals(), sectionWeight(), sectionActivity());
+  root.append(dateNav(), sectionMeals(), sectionWeight(), sectionActivity());
   if (state.presets.length) root.append(sectionPresets());
   root.append(el('div', { class: 'faint', style: 'padding:4px 0 8px' },
-    `${jpDate(state.today)}　行をタップすると直せます。`));
+    '行をタップすると直せます。'));
 }
 
 // ---------------------------------------------------------------- 献立
 
 const SLOTS = ['朝', '昼', '夜', '間食'];
 
+/** 前後の日へ。昨日の食べ忘れを翌朝入れる、が一番ありがちな場面。 */
+function dateNav() {
+  // 子は el() に渡す。生の append は null を文字列 "null" にする（2回踏んだ）
+  return el('div', { class: 'datenav' },
+    el('button', { class: 'dn-btn', onclick: () => setViewDay(addDays(state.today, -1)) }, '‹'),
+    el('span', { class: 'dn-day' }, state.isToday ? `今日　${jpDate(state.today)}` : jpDate(state.today)),
+    el('button', { class: 'dn-btn', disabled: state.isToday, onclick: () => setViewDay(addDays(state.today, 1)) }, '›'),
+    state.isToday ? null : el('button', { class: 'btn sm', onclick: () => goToday() }, '今日へ'));
+}
+
 function sectionMeals() {
   const box = el('div', { class: 'card' });
-  box.append(el('h2', {}, '今日の献立'));
+  box.append(el('h2', {}, state.isToday ? '今日の献立' : `${jpDate(state.today)} の献立`));
 
-  // 区分ごとに並べ、空でも「＋」を出す。1件入れたら追加口が消えるのは不便。
   for (const slot of SLOTS) {
     const rows = state.meals.filter((m) => m.slot === slot);
     const t = sumItems(rows.flatMap((m) => m.items));
@@ -49,9 +67,10 @@ function sectionMeals() {
       el('span', { class: 'slot-name' }, slot),
       el('span', { class: 'slot-kcal' }, rows.length ? fmt(t.kcal) : '—'),
       el('button', {
-        class: 'slot-add',
-        onclick: () => { reserveSlot(slot); goTab('chat'); },
-      }, '＋')));
+        class: `slot-add ${openSlot === slot ? 'on' : ''}`,
+        onclick: () => { openSlot = openSlot === slot ? null : slot; editing = null; render(); },
+      }, openSlot === slot ? '×' : '＋')));
+    if (openSlot === slot) box.append(addPanel(slot));
     for (const m of rows) box.append(editing === m.id ? mealEditor(m) : mealRow(m));
   }
 
@@ -61,6 +80,67 @@ function sectionMeals() {
     el('span', { class: 'm-name' }, '計'),
     el('span', { class: 'm-kcal' }, fmt(all.kcal))));
   return box;
+}
+
+/**
+ * ＋を押すと出る板。上から「よく食べるもの（1タップ）」「数値で入れる」「写真・文章で」。
+ * AIを通さない道を先に置く。
+ */
+function addPanel(slot) {
+  const panel = el('div', { class: 'addpanel' });
+
+  const recentBox = el('div', { class: 'ap-recent' });
+  panel.append(el('div', { class: 'ap-label' }, 'よく食べるもの'), recentBox);
+  recentMeals(6).then((rs) => {
+    if (!rs.length) { recentBox.append(el('span', { class: 'faint' }, 'まだありません')); return; }
+    for (const r of rs) {
+      const t = sumItems(r.items);
+      recentBox.append(el('button', {
+        class: 'chip again',
+        onclick: async () => {
+          const id = uid();
+          await db.putMeal({ id, day: targetDay(), at: stampFor(targetDay()), slot, items: structuredClone(r.items), source: 'again' });
+          openSlot = null;
+          await refresh();
+          undoToast(`${r.label} を ${slot} に記録しました`, async () => { await db.delMeal(id); await refresh(); });
+        },
+      }, el('b', {}, r.label.length > 14 ? r.label.slice(0, 14) + '…' : r.label), ` ${fmt(t.kcal)}`));
+    }
+  });
+
+  const nm = el('input', { type: 'text', placeholder: '品名（例：プロテイン）' });
+  const kc = el('input', { type: 'number', inputmode: 'numeric', placeholder: 'kcal' });
+  const pp = el('input', { type: 'number', inputmode: 'decimal', placeholder: 'P g' });
+  const ff = el('input', { type: 'number', inputmode: 'decimal', placeholder: 'F g' });
+  const cc = el('input', { type: 'number', inputmode: 'decimal', placeholder: 'C g' });
+  panel.append(
+    el('div', { class: 'ap-label' }, '数値で入れる'),
+    el('div', { class: 'ap-grid' }, nm, kc),
+    el('div', { class: 'ap-grid3' }, pp, ff, cc),
+    el('div', { style: 'display:flex;justify-content:flex-end;gap:8px;margin-top:8px' },
+      el('button', {
+        class: 'btn sm primary',
+        onclick: async () => {
+          const kcal = Number(kc.value);
+          if (!nm.value.trim() || kc.value === '' || !(kcal >= 0)) { toast('品名とkcalを入れてください'); return; }
+          const id = uid();
+          await db.putMeal({
+            id, day: targetDay(), at: stampFor(targetDay()), slot, source: 'manual',
+            items: [{ name: nm.value.trim(), amount: '', kcal: Math.round(kcal),
+                      p: Number(pp.value) || 0, f: Number(ff.value) || 0, c: Number(cc.value) || 0 }],
+          });
+          openSlot = null;
+          await refresh();
+          undoToast(`${nm.value.trim()} を ${slot} に記録しました`, async () => { await db.delMeal(id); await refresh(); });
+        },
+      }, '登録')));
+
+  panel.append(el('div', { class: 'ap-label' }, '写真・文章で'),
+    el('button', {
+      class: 'btn sm', style: 'width:100%',
+      onclick: () => { reserveSlot(slot); openSlot = null; goTab('chat'); },
+    }, `チャットで ${slot} を記録する`));
+  return panel;
 }
 
 function mealRow(m) {
@@ -157,7 +237,7 @@ function sectionWeight() {
     if (editing !== 'weight' && !w) {
       box.append(el('div', { class: 'state empty' },
         el('span', { class: 's-time' }, '— —'),
-        el('span', { class: 's-val' }, '今日の体重を入れる'),
+        el('span', { class: 's-val' }, state.isToday ? '今日の体重を入れる' : 'この日の体重を入れる'),
         el('button', { class: 's-fix', onclick: () => { editing = 'weight'; render(); } }, 'ひらく')));
       return box;
     }
@@ -171,7 +251,7 @@ function sectionWeight() {
           onclick: async () => {
             const v = Number(kg.value);
             if (!(v > 20 && v < 300)) { toast('体重を確認してください'); return; }
-            await db.putWeight({ day: currentDay(), kg: r1(v), fatPct: Number(fat.value) || null, at: new Date().toISOString() });
+            await db.putWeight({ day: targetDay(), kg: r1(v), fatPct: Number(fat.value) || null, at: stampFor(targetDay()) });
             editing = null;
             await refresh();
             toast('記録しました');
@@ -229,7 +309,7 @@ function sectionActivity() {
           onclick: async () => {
             const v = Number(kc.value);
             if (!nm.value.trim() || !(v > 0)) { toast('種目と消費カロリーを入れてください'); return; }
-            await db.putActivity({ id: uid(), day: currentDay(), at: new Date().toISOString(), name: nm.value.trim(), kcal: r0(v), minutes: null });
+            await db.putActivity({ id: uid(), day: targetDay(), at: stampFor(targetDay()), name: nm.value.trim(), kcal: r0(v), minutes: null });
             editing = null;
             await refresh();
           },
@@ -263,7 +343,7 @@ function sectionPresets() {
           class: 's-fix',
           onclick: async () => {
             const id = uid();
-            const rec = { id, day: currentDay(), at: new Date().toISOString(), slot: slotNow(), items: structuredClone(p.items), source: 'preset' };
+            const rec = { id, day: targetDay(), at: stampFor(targetDay()), slot: slotNow(), items: structuredClone(p.items), source: 'preset' };
             await db.putMeal(rec);
             await db.putPreset({ ...p, useCount: (p.useCount || 0) + 1 });
             await refresh();
