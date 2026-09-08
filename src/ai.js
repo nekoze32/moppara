@@ -17,6 +17,12 @@ async function fetchRetry(url, opts, { tries = 3, onRetry } = {}) {
     try {
       const res = await fetch(url, opts);
       if (res.ok || !RETRYABLE.has(res.status) || i === tries) return res;
+      // 1日あたりの枠切れは待っても戻らない。やり直すだけ枠を減らす。
+      if (res.status === 429) {
+        const peek = await res.clone().json().catch(() => null);
+        const ids = JSON.stringify(peek?.error?.details || '');
+        if (/PerDay/i.test(ids) || /"quotaValue"\s*:\s*"0"/.test(ids)) return res;
+      }
       const ra = Number(res.headers.get('retry-after'));
       const wait = Math.min(8000, ra > 0 ? ra * 1000 : i * 1800 + Math.random() * 600);
       onRetry?.({ attempt: i, of: tries, status: res.status, wait });
@@ -209,11 +215,34 @@ async function askGemini({ settings, context, history, text, imageDataUrl, signa
   return coerce(parseLoose(out));
 }
 
+/** 429の本文から「どの枠に、いくつの上限で当たったか」を取り出す。 */
+function quotaDetail(json) {
+  const vio = (json?.error?.details || [])
+    .flatMap((d) => d.violations || [])
+    .filter((v) => v.quotaId || v.quotaMetric);
+  if (!vio.length) return null;
+  return vio.map((v) => {
+    const id = v.quotaId || v.quotaMetric || '';
+    const limit = v.quotaValue != null ? `上限 ${v.quotaValue}` : '';
+    const m = v.quotaDimensions?.model ? `／モデル ${v.quotaDimensions.model}` : '';
+    const per = /PerDay/i.test(id) ? '1日あたり' : /PerMinute/i.test(id) ? '1分あたり' : '';
+    return [per, limit, m].filter(Boolean).join(' ') || id;
+  }).join('　');
+}
+
 function geminiError(status, json, model) {
   const msg = json?.error?.message || '';
   if (status === 400 && /API key not valid/i.test(msg)) return 'GeminiのAPIキーが正しくありません。設定を確認してください。';
   if (status === 404) return `モデル「${model}」がこのキーでは使えません。設定タブの「使えるモデルを取得」で選び直してください。`;
-  if (status === 429) return '無料枠の上限（1分あたり／1日あたりの回数）に当たりました。しばらく置いて試してください。';
+  if (status === 429) {
+    // どの枠かはAPIが教えてくれる。自分の推測に置き換えない。
+    const d = quotaDetail(json);
+    if (d && /上限 0/.test(d)) {
+      return `このキーではモデル「${model}」の枠が 0 です（${d}）。無料枠の対象になっているモデルへ、設定の「使えるモデルを取得」から変えてください。`;
+    }
+    return `回数の上限に当たりました${d ? `：${d}` : ''}。${msg ? `
+${msg}` : ''}`;
+  }
   if (status === 403) return 'このAPIキーには権限がありません。Google AI Studioで作り直してください。';
   if (status === 503) return `Google側が混み合っています（503）。3回やり直しても駄目でした。数分置くか、設定の「使えるモデルを取得」で別のFlashモデルに変えてみてください。`;
   if (status >= 500) return `Google側の一時的な不具合です（${status}）。少し置いてもう一度どうぞ。`;
@@ -274,7 +303,8 @@ function anthropicError(status, json, model) {
   const msg = json?.error?.message || '';
   if (status === 401) return 'AnthropicのAPIキーが正しくありません。設定を確認してください。';
   if (status === 404 || /model/i.test(msg) && status === 400) return `モデル「${model}」が使えません。設定タブの「使えるモデルを取得」で選び直してください。`;
-  if (status === 429) return 'レート上限に当たりました。少し置いて試してください。';
+  if (status === 429) return `レート上限に当たりました。${msg ? `
+${msg}` : '少し置いて試してください。'}`;
   if (status === 400 && /credit|balance/i.test(msg)) return 'Anthropicの残高が足りません。コンソールでクレジットを追加してください。';
   if (status === 529) return 'Anthropic側が混み合っています（529）。3回やり直しても駄目でした。少し置いてもう一度どうぞ。';
   if (status >= 500) return `Anthropic側の一時的な不具合です（${status}）。少し置いてもう一度どうぞ。`;
