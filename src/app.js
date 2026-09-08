@@ -172,6 +172,9 @@ function paintStatusBar() {
 
   const rem = remaining();
   const b = state.budget;
+  // PFCの目標と摂取。帯の本体とpillの両方で使うので、どちらより先に用意する
+  const t = state.targets || { p: 0, f: 0, c: 0 };
+  const macros = [['p', state.eaten.p, t.p], ['f', state.eaten.f, t.f], ['c', state.eaten.c, t.c]];
   const over = rem.kcal < 0;
   const tight = !over && rem.pct > 0.85;
   bar.classList.toggle('over', over);
@@ -192,11 +195,13 @@ function paintStatusBar() {
   $('#mini-kcal').textContent = next;
   $('#mini-label').textContent = $('#sb-label').textContent;
   $('#mini-date').textContent = state.isToday ? jpDate(state.today) : '過去の日';
-  // 縮めた帯の右側は空くので、PFCの残りを並べる
+  // 縮めた帯の右側は、数字でなく小さなバー3本（達成率が一目で分かる）
   const mp = $('#mini-pfc');
   mp.textContent = '';
-  for (const [k, v] of [['p', rem.p], ['f', rem.f], ['c', rem.c]]) {
-    mp.append(el('span', { class: k }, el('em', {}), k.toUpperCase(), el('b', {}, `${v}`)));
+  for (const [k, got, tgt] of macros) {
+    const ratio = tgt > 0 ? got / tgt : 0;
+    mp.append(el('span', { class: `${k}${ratio > 1.001 ? ' over' : ''}` },
+      k.toUpperCase(), el('i', { class: 'sbar' }, el('b', { style: `width:${(clamp(ratio, 0, 1) * 100).toFixed(0)}%` }))));
   }
 
   // リング：食べた割合
@@ -208,15 +213,17 @@ function paintStatusBar() {
   ring.classList.toggle('tight', tight);
   $('#sb-pct').textContent = `${Math.round(rem.pct * 100)}%`;
 
-  // PFCは3枚の小さなタイル。幅はそれぞれの達成率
-  const t = state.targets || { p: 0, f: 0, c: 0 };
+  // PFCは「摂取／目標」のバー。残りの数字だけでは目標の何割か分からない。超えたら朱。
   const m = $('#sb-macros');
   m.textContent = '';
-  for (const [k, got, tgt, v] of [['p', state.eaten.p, t.p, rem.p], ['f', state.eaten.f, t.f, rem.f], ['c', state.eaten.c, t.c, rem.c]]) {
-    const w = clamp(tgt > 0 ? got / tgt : 0, 0, 1) * 100;
-    m.append(el('div', { class: `mac ${k}` },
-      el('i', {}, el('b', { style: `width:${w.toFixed(0)}%` })),
-      el('span', {}, k.toUpperCase(), el('em', {}, `${v}`))));
+  for (const [k, got, tgt] of macros) {
+    const ratio = tgt > 0 ? got / tgt : 0;
+    const w = clamp(ratio, 0, 1) * 100;
+    const isOver = ratio > 1.001;
+    m.append(el('div', { class: `mrow ${k}${isOver ? ' over' : ''}` },
+      el('span', { class: 'ml' }, k.toUpperCase()),
+      el('i', { class: 'bar' }, el('b', { style: `width:${w.toFixed(0)}%` })),
+      el('span', { class: 'v' }, el('b', {}, `${r0(got)}`), ` / ${r0(tgt)} g`, isOver ? el('em', {}, ` +${r0(got - tgt)}`) : null)));
   }
 
   $('#sb-date').textContent = state.isToday ? jpDate(state.today) : '過去の日を見ています';

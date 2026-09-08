@@ -618,3 +618,26 @@ details.acc{border:none;box-shadow:var(--lift);border-radius:18px}
 .warnbar,.daynotice{margin-top:var(--bar-h)}
 body.onboarding{--bar-h:0px}
 body.onboarding .statusbar{display:none}
+
+
+/* ---- PFCのバー（摂取／目標）。残りの数字だけでは目標の何割か分からない ---- */
+.sb-macros{display:flex;flex-direction:column;gap:5px;padding:4px 0 0;flex-wrap:nowrap}
+.mrow{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:8px;min-width:0}
+.mrow .ml{font-size:11px;font-weight:900;letter-spacing:.02em}
+.mrow.p .ml{color:var(--p)} .mrow.f .ml{color:var(--f)} .mrow.c .ml{color:var(--c)}
+.mrow .bar{display:block;height:8px;border-radius:4px;background:var(--surface2);overflow:hidden;min-width:60px}
+.mrow .bar b{display:block;height:100%;border-radius:4px;transition:width .35s cubic-bezier(.2,.7,.3,1)}
+.mrow.p .bar b{background:var(--p)} .mrow.f .bar b{background:var(--f)} .mrow.c .bar b{background:var(--c)}
+.mrow.over .bar b{background:var(--danger)}
+.mrow .v{font-family:var(--num);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mrow .v b{font-weight:800;color:var(--ink);font-size:12.5px}
+.mrow .v em{font-style:normal;color:var(--danger);font-weight:800}
+@media (prefers-reduced-motion:reduce){.mrow .bar b{transition:none}}
+
+/* 縮めた帯：小さなバー3本 */
+.mini-pfc span{gap:4px}
+.mini-pfc .sbar{display:inline-block;width:26px;height:5px;border-radius:3px;background:var(--surface2);overflow:hidden;vertical-align:middle}
+.mini-pfc .sbar b{display:block;height:100%;border-radius:3px}
+.mini-pfc .p .sbar b{background:var(--p)} .mini-pfc .f .sbar b{background:var(--f)} .mini-pfc .c .sbar b{background:var(--c)}
+.mini-pfc .over .sbar b{background:var(--danger)}
+.mini-pfc em{display:none}
