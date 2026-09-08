@@ -584,29 +584,30 @@ details.acc{border:none;box-shadow:var(--lift);border-radius:18px}
 
 
 
-/* ---- 帯の畳み込み（滑らか版）----
-   高さ：grid-template-rows 1fr→0fr（配置計算が軽い）
-   見た目：opacity と transform だけ（GPUで描ける。文字サイズや高さは直接動かさない） */
-.statusbar{position:relative;padding-bottom:6px}
-.hero-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .34s cubic-bezier(.22,.61,.36,1)}
-.hero-inner{min-height:0;overflow:hidden;transition:opacity .22s ease,transform .34s cubic-bezier(.22,.61,.36,1)}
+/* ---- 帯の畳み込み（重ね置き・スクロール連動）----
+   帯は中身の上に重ねる（absolute）。縮んでも下の領域の高さは変わらないので、
+   指で1px動かせば中身は1pxだけ動く。縮む量は --c（0〜1）でJSがスクロール量から決める。
+   時間で動かすと縮んだぶん中身がまとめて跳ぶ。下の領域の高さを変えると指より速く進む。 */
+:root{--bar-h:170px}
+.statusbar{position:absolute;top:0;left:0;right:0;z-index:30;--c:0;--hero-h:160px;
+           padding:max(10px,env(safe-area-inset-top)) 14px 6px;background:var(--bg);border-bottom:none}
+.hero-wrap{height:calc(var(--hero-h) * (1 - var(--c)));overflow:hidden}
+.hero-inner{transform:translateY(calc(var(--c) * -10px));opacity:calc(1 - var(--c) * 1.6)}
 .mini{position:absolute;left:14px;right:14px;top:max(10px,env(safe-area-inset-top));
       display:flex;align-items:baseline;gap:6px;
       background:var(--surface);border-radius:14px;padding:9px 14px;box-shadow:var(--lift);
-      opacity:0;transform:translateY(-6px);pointer-events:none;
-      transition:opacity .22s ease,transform .34s cubic-bezier(.22,.61,.36,1)}
+      opacity:calc(var(--c) * 1.6 - 0.6);transform:translateY(calc((1 - var(--c)) * -6px));pointer-events:none}
+.statusbar.pill-active .mini{pointer-events:auto}
 .mini-label{font-size:11px;font-weight:700;color:var(--ink-faint);letter-spacing:.06em}
 .mini-kcal{font-family:var(--num);font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
 .mini-unit{font-size:11px;font-weight:700;color:var(--ink-soft)}
 .mini-date{margin-left:auto;font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
 .statusbar.over .mini-kcal{color:var(--danger)} .statusbar.tight .mini-kcal{color:var(--warn)}
-
-.statusbar.compact .hero-wrap{grid-template-rows:0fr}
-.statusbar.compact .hero-inner{opacity:0;transform:translateY(-8px)}
-.statusbar.compact .mini{opacity:1;transform:none;pointer-events:auto}
-/* 畳んだあと、1行ぶんの高さを確保する（miniは absolute なので） */
-.statusbar.compact{padding-bottom:calc(6px + 44px)}
 .statusbar.setup .mini-kcal,.statusbar.setup .mini-unit{display:none}
-@media (prefers-reduced-motion:reduce){
-  .hero-wrap,.hero-inner,.mini{transition:none}
-}
+
+/* 下の領域は帯のぶんだけ頭を空けておく（帯が縮んでもここは変えない） */
+.scroll{padding-top:calc(var(--bar-h) + 8px)}
+#chat-log{padding-top:calc(var(--bar-h) + 8px)}
+.warnbar,.daynotice{margin-top:var(--bar-h)}
+body.onboarding{--bar-h:0px}
+body.onboarding .statusbar{display:none}

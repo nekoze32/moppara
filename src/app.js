@@ -67,40 +67,70 @@ async function boot() {
  * チャットは下寄せで scrollTop が動きにくいので、入力欄のフォーカスでも畳む。
  * 40px で畳み 10px で開く（ヒステリシス）。境目で震えないため。
  */
+/**
+ * 帯の畳み込み。帯は中身の上に重ねてあり、縮んでも下の領域は動かない。
+ * 縮む量 --c は時間でなくスクロール量から決める（一覧：上からの距離、チャット：下端からの距離）。
+ * 入力欄のフォーカス（キーボード）だけはスクロールが無いので、260msの補間で寄せる。
+ */
 function bindCollapse() {
   const bar = $('#statusbar');
-  let byScroll = false, byFocus = false;
-  const apply = () => bar.classList.toggle('compact', byScroll || byFocus);
+  const hero = $('.hero');
+  const foot = $('.sb-foot');
+  let range = 110;
+  let scrollC = 0, focusC = 0, tween = null;
 
-  // 一覧系：上から40pxで畳み、10px未満で開く
-  const watchTop = (node) => {
-    node.addEventListener('scroll', () => {
-      const y = node.scrollTop;
-      if (!byScroll && y > 40) { byScroll = true; apply(); }
-      else if (byScroll && y < 10) { byScroll = false; apply(); }
-    }, { passive: true });
+  // 開いた状態の帯の高さ。中身の高さは --c に関係なく測れる
+  const measure = () => {
+    const cs = getComputedStyle(bar);
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const heroH = hero.offsetHeight + foot.offsetHeight;
+    if (heroH <= 0) return;
+    bar.style.setProperty('--hero-h', `${heroH}px`);
+    document.documentElement.style.setProperty('--bar-h', `${Math.round(pad + heroH)}px`);
+    range = Math.max(60, heroH - 44);     // 畳み切ったときに1行（約44px）が残る
   };
-  // チャット：下端が基準。過去ログへ40px以上さかのぼったら畳み、下端に戻れば開く
-  const watchBottom = (node) => {
-    node.addEventListener('scroll', () => {
-      const d = node.scrollHeight - node.scrollTop - node.clientHeight;
-      if (!byScroll && d > 40) { byScroll = true; apply(); }
-      else if (byScroll && d < 10) { byScroll = false; apply(); }
-    }, { passive: true });
+  const paint = () => {
+    const c = Math.max(scrollC, focusC);
+    bar.style.setProperty('--c', c.toFixed(3));
+    bar.classList.toggle('pill-active', c > 0.6);
   };
+
+  const watchTop = (node) => node.addEventListener('scroll', () => {
+    scrollC = clamp(node.scrollTop / range, 0, 1); paint();
+  }, { passive: true });
+  const watchBottom = (node) => node.addEventListener('scroll', () => {
+    const d = node.scrollHeight - node.scrollTop - node.clientHeight;
+    scrollC = clamp(d / range, 0, 1); paint();
+  }, { passive: true });
   for (const s of $$('.scroll')) watchTop(s);
   watchBottom($('#chat-log'));
 
+  const tweenFocus = (to) => {
+    if (tween) cancelAnimationFrame(tween);
+    const from = focusC, t0 = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / 260);
+      const e = 1 - Math.pow(1 - k, 3);
+      focusC = from + (to - from) * e; paint();
+      if (k < 1) tween = requestAnimationFrame(step); else tween = null;
+    };
+    tween = requestAnimationFrame(step);
+  };
   const input = $('#chat-input');
-  input.addEventListener('focus', () => { byFocus = true; apply(); });
-  input.addEventListener('blur', () => { byFocus = false; apply(); });
+  input.addEventListener('focus', () => tweenFocus(1));
+  input.addEventListener('blur', () => tweenFocus(0));
 
+  bar.__measure = measure;
   bar.__recheck = () => {
     const log = $('#screen-chat:not([hidden]) #chat-log');
-    if (log) byScroll = (log.scrollHeight - log.scrollTop - log.clientHeight) > 40;
-    else { const cur = $('.screen:not([hidden]) .scroll'); byScroll = !!cur && cur.scrollTop > 40; }
-    apply();
+    if (log) scrollC = clamp((log.scrollHeight - log.scrollTop - log.clientHeight) / range, 0, 1);
+    else { const cur = $('.screen:not([hidden]) .scroll'); scrollC = cur ? clamp(cur.scrollTop / range, 0, 1) : 0; }
+    paint();
   };
+  measure();
+  window.addEventListener('resize', measure);
+  if (document.fonts?.ready) document.fonts.ready.then(measure);
+  paint();
 }
 
 function navigate(name) {
@@ -118,6 +148,7 @@ function navigate(name) {
 
 function paintStatusBar() {
   const bar = $('#statusbar');
+  queueMicrotask(() => bar.__measure?.());
   const setLabel = (t) => { $('#sb-label').textContent = t; };
 
   if (!state.ready) {
