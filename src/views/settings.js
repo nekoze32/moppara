@@ -5,7 +5,7 @@ import { $, el, toast, r1, fmt } from '../util.js';
 import * as db from '../db.js';
 import { state, saveSettings, refresh } from '../store.js';
 import { ACTIVITY_LEVELS, dailyBudget, macroTargets, activityFactor } from '../nutrition.js';
-import { PROVIDERS, listModels, AIError } from '../ai.js';
+import { PROVIDERS, listModels, rankModels, testModel, AIError } from '../ai.js';
 
 let root;
 let open = null;   // いま開いている組：'ai' | 'body' | 'goal' | 'macro' | 'ops'
@@ -88,26 +88,53 @@ function groupAI() {
     prov.addEventListener('change', paint);
     paint();
 
-    const fetchBtn = el('button', { class: 'btn sm' }, '使えるモデルを取得');
-    fetchBtn.addEventListener('click', async () => {
-      fetchBtn.disabled = true; fetchBtn.textContent = '取得中…';
+    // モデル名は当てにいくと外す。実際に1回投げて通ったものを採る。
+    const report = el('div', { class: 'hint', style: 'margin-top:6px' });
+    const probeOf = () => {
+      const p = { ...s, provider: prov.value };
+      p[prov.value === 'anthropic' ? 'anthropicKey' : 'geminiKey'] = keyIn.value.trim();
+      return p;
+    };
+
+    const autoBtn = el('button', { class: 'btn sm' }, '使えるモデルを自動で選ぶ');
+    autoBtn.addEventListener('click', async () => {
+      autoBtn.disabled = true;
       try {
-        const probe = { ...s, provider: prov.value };
-        probe[prov.value === 'anthropic' ? 'anthropicKey' : 'geminiKey'] = keyIn.value.trim();
-        const models = await listModels(probe);
-        const sel = el('select', {}, ...models.map((m) => el('option', { value: m.id, selected: m.id === modelIn.value }, m.id)));
-        sel.addEventListener('change', () => { modelIn.value = sel.value; });
-        fetchBtn.replaceWith(sel);
+        report.textContent = 'モデル一覧を取得しています…';
+        const cands = rankModels(await listModels(probeOf())).slice(0, 5);
+        if (!cands.length) { report.textContent = '使えるモデルがありませんでした。'; autoBtn.disabled = false; return; }
+        for (const [i, id] of cands.entries()) {
+          report.textContent = `${id} を試しています（${i + 1}/${cands.length}）…`;
+          const r = await testModel(probeOf(), id);
+          if (r.ok) {
+            modelIn.value = id;
+            report.textContent = `${id} が通りました。「保存」を押してください。`;
+            autoBtn.disabled = false;
+            return;
+          }
+        }
+        report.textContent = `${cands.length}件とも通りませんでした。キーを確認してください。`;
       } catch (err) {
-        toast(err instanceof AIError ? err.message : '取得できませんでした');
-        fetchBtn.disabled = false; fetchBtn.textContent = '使えるモデルを取得';
+        report.textContent = err instanceof AIError ? err.message : '取得できませんでした';
       }
+      autoBtn.disabled = false;
+    });
+
+    const testBtn = el('button', { class: 'btn sm' }, 'いまのモデルで試す');
+    testBtn.addEventListener('click', async () => {
+      testBtn.disabled = true;
+      report.textContent = `${modelIn.value} を試しています…`;
+      const r = await testModel(probeOf(), modelIn.value.trim());
+      report.textContent = r.ok ? `${modelIn.value} は使えます。` : r.message;
+      testBtn.disabled = false;
     });
 
     body.append(
       field('使うAI', prov),
       el('div', { class: 'field' }, el('label', {}, 'APIキー'), keyIn, note),
-      el('div', { class: 'field' }, el('label', {}, 'モデル'), modelIn, fetchBtn));
+      el('div', { class: 'field' }, el('label', {}, 'モデル'), modelIn,
+        el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, autoBtn, testBtn),
+        report));
 
     return () => {
       const p = { provider: prov.value };

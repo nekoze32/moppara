@@ -238,7 +238,12 @@ function geminiError(status, json, model) {
     // どの枠かはAPIが教えてくれる。自分の推測に置き換えない。
     const d = quotaDetail(json);
     if (d && /上限 0/.test(d)) {
-      return `このキーではモデル「${model}」の枠が 0 です（${d}）。無料枠の対象になっているモデルへ、設定の「使えるモデルを取得」から変えてください。`;
+      return `このキーではモデル「${model}」の枠が 0 です（${d}）。設定の「使えるモデルを自動で選ぶ」を押してください。`;
+    }
+    const small = /limit:\s*([0-9]+)/.exec(msg);
+    if (small && Number(small[1]) <= 100) {
+      return `モデル「${model}」の無料枠は ${small[1]} 回しかありません（有料モデルの試用ぶん）。`
+        + `設定の「使えるモデルを自動で選ぶ」を押すと、無料枠の大きいモデルに切り替えます。`;
     }
     return `回数の上限に当たりました${d ? `：${d}` : ''}。${msg ? `
 ${msg}` : ''}`;
@@ -309,6 +314,39 @@ ${msg}` : '少し置いて試してください。'}`;
   if (status === 529) return 'Anthropic側が混み合っています（529）。3回やり直しても駄目でした。少し置いてもう一度どうぞ。';
   if (status >= 500) return `Anthropic側の一時的な不具合です（${status}）。少し置いてもう一度どうぞ。`;
   return `Anthropicでエラー（${status}）${msg ? '：' + msg : ''}`;
+}
+
+/**
+ * そのキーでそのモデルが本当に通るかを、最小の1回で確かめる。
+ * モデル名を当てにいくと外すので、推測せず投げて確かめる。
+ */
+export async function testModel(settings, modelId) {
+  const probe = { ...settings, [settings.provider === 'anthropic' ? 'anthropicModel' : 'geminiModel']: modelId };
+  try {
+    await ask({ settings: probe, context: '（疎通確認）', history: [], text: 'ok と一言だけ返してください' });
+    return { ok: true, model: modelId };
+  } catch (e) {
+    return { ok: false, model: modelId, message: e.message || String(e) };
+  }
+}
+
+/** 一覧から食事の写真を扱えそうなものを、通しやすい順に並べる。 */
+export function rankModels(models) {
+  const bad = /embedding|imagen|veo|tts|audio|live|native|image-gen/i;
+  return models
+    .map((m) => (typeof m === 'string' ? m : m.id))
+    .filter((id) => !bad.test(id))
+    .sort((a, b) => score(b) - score(a));
+}
+function score(id) {
+  let n = 0;
+  if (/flash/i.test(id)) n += 10;          // 無料枠の対象はFlash系
+  if (/lite/i.test(id)) n += 3;            // Liteは枠が大きいことが多い
+  if (/pro/i.test(id)) n -= 5;             // Proは有料寄り
+  if (/preview|exp|experimental/i.test(id)) n -= 4;
+  const v = /(\d+(?:\.\d+)?)/.exec(id);
+  if (v) n += Math.min(3, Number(v[1]) / 2); // 新しめを少しだけ優先
+  return n;
 }
 
 // ---------------------------------------------------------------- モデル一覧
