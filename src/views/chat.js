@@ -300,7 +300,14 @@ function userBubble(text, thumb) {
   return n;
 }
 
-function scrollDown() { requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; }); }
+// 下寄せを justify-content に頼らなくなったので、開いた直後は自分で下端へ送る。
+// フォントや写真で高さが後から変わるため、数回に分けて送る。
+function scrollDown() {
+  const go = () => { logEl.scrollTop = logEl.scrollHeight; };
+  requestAnimationFrame(() => { go(); requestAnimationFrame(go); });
+  setTimeout(go, 80);
+  setTimeout(go, 320);
+}
 
 async function thumbnail(dataUrl, px = 220) {
   return new Promise((res) => {

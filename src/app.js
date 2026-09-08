@@ -72,25 +72,33 @@ function bindCollapse() {
   let byScroll = false, byFocus = false;
   const apply = () => bar.classList.toggle('compact', byScroll || byFocus);
 
-  const watch = (node) => {
-    if (!node) return;
+  // 一覧系：上から40pxで畳み、10px未満で開く
+  const watchTop = (node) => {
     node.addEventListener('scroll', () => {
       const y = node.scrollTop;
       if (!byScroll && y > 40) { byScroll = true; apply(); }
       else if (byScroll && y < 10) { byScroll = false; apply(); }
     }, { passive: true });
   };
-  for (const s of $$('.scroll')) watch(s);
-  watch($('#chat-log'));
+  // チャット：下端が基準。過去ログへ40px以上さかのぼったら畳み、下端に戻れば開く
+  const watchBottom = (node) => {
+    node.addEventListener('scroll', () => {
+      const d = node.scrollHeight - node.scrollTop - node.clientHeight;
+      if (!byScroll && d > 40) { byScroll = true; apply(); }
+      else if (byScroll && d < 10) { byScroll = false; apply(); }
+    }, { passive: true });
+  };
+  for (const s of $$('.scroll')) watchTop(s);
+  watchBottom($('#chat-log'));
 
   const input = $('#chat-input');
   input.addEventListener('focus', () => { byFocus = true; apply(); });
   input.addEventListener('blur', () => { byFocus = false; apply(); });
 
-  // 画面を切り替えたら、その画面のスクロール位置で判定し直す
   bar.__recheck = () => {
-    const cur = $('.screen:not([hidden]) .scroll') || $('#chat-log');
-    byScroll = !!cur && cur.scrollTop > 40;
+    const log = $('#screen-chat:not([hidden]) #chat-log');
+    if (log) byScroll = (log.scrollHeight - log.scrollTop - log.clientHeight) > 40;
+    else { const cur = $('.screen:not([hidden]) .scroll'); byScroll = !!cur && cur.scrollTop > 40; }
     apply();
   };
 }
@@ -121,6 +129,8 @@ function paintStatusBar() {
     const m0 = $('#sb-macros');
     m0.textContent = '';
     m0.append(el('div', { class: 'sb-setup' }, `あと ${state.missing.join('・')}。チャットで教えてください。`));
+    $('#mini-label').textContent = '設定がまだです';
+    $('#mini-date').textContent = jpDate(state.today);
     return;
   }
   bar.classList.remove('setup');
@@ -144,6 +154,9 @@ function paintStatusBar() {
     kcalEl.classList.add('changed');
   }
   $('#sb-unit').textContent = 'kcal';
+  $('#mini-kcal').textContent = next;
+  $('#mini-label').textContent = $('#sb-label').textContent;
+  $('#mini-date').textContent = state.isToday ? jpDate(state.today) : '過去の日';
 
   // リング：食べた割合
   const C = 251.3;

@@ -53,7 +53,8 @@
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none !important}
-html,body{height:100%}
+html{height:100%;overflow:hidden}
+body{height:100%;height:100dvh;overflow:hidden;position:fixed;inset:0;width:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
   font-family:var(--jp);
@@ -109,7 +110,7 @@ a{color:var(--accent)}
 #main{flex:1 1 auto;min-height:0;display:flex}
 .screen{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column}
 .screen[hidden]{display:none}
-.scroll{flex:1 1 auto;overflow-y:auto;padding:14px 14px calc(var(--tab-h) + 24px);-webkit-overflow-scrolling:touch}
+.scroll{flex:1 1 auto;overflow-y:auto;padding:14px 14px calc(var(--tab-h) + 24px);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
 .tabbar{
   position:fixed;left:0;right:0;bottom:0;z-index:40;
@@ -170,7 +171,8 @@ textarea{resize:none}
 /* ---------- チャット ---------- */
 /* 少ないときは下に寄せる。上に溜めると画面の大半が空白になる。 */
 .chat-log{flex:1 1 auto;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;
-          justify-content:flex-end;gap:9px;-webkit-overflow-scrolling:touch}
+          gap:9px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.chat-log > :first-child{margin-top:auto}   /* 短いときは下に寄せ、長いときは普通に上へスクロールできる */
 .msg{max-width:84%;padding:10px 14px;white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.78}
 .msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:15px 15px 4px 15px}
 .msg.ai{align-self:flex-start;background:var(--surface2);border-radius:15px 15px 15px 4px}
@@ -581,22 +583,30 @@ details.acc{border:none;box-shadow:var(--lift);border-radius:18px}
 .toast{border-radius:14px}
 
 
-/* ---- 帯の畳み込み：下へスクロールで縮み、上へ戻れば開く ---- */
-.statusbar{transition:padding .28s cubic-bezier(.2,.7,.3,1)}
-.statusbar .hero{transition:padding .28s cubic-bezier(.2,.7,.3,1),border-radius .28s ease}
-.statusbar .ring{max-width:92px;max-height:92px;transition:max-width .28s cubic-bezier(.2,.7,.3,1),max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,margin .28s ease;overflow:hidden}
-.statusbar .sb-macros{max-height:48px;transition:max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,padding .28s ease;overflow:hidden}
-.statusbar .sb-foot{max-height:24px;transition:max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,padding .28s ease;overflow:hidden}
-.statusbar .sb-num{transition:font-size .28s cubic-bezier(.2,.7,.3,1)}
-.statusbar .sb-remain{transition:margin .28s ease}
-.statusbar.compact{padding-bottom:4px}
-.statusbar.compact .hero{padding:8px 14px;border-radius:16px;align-items:center}
-.statusbar.compact .ring{max-width:0;max-height:0;opacity:0;margin-right:-14px}
-.statusbar.compact .sb-macros,.statusbar.compact .sb-foot{max-height:0;opacity:0;padding:0}
-.statusbar.compact .sb-num{font-size:22px}
-.statusbar.compact .hero-r{display:flex;align-items:baseline;gap:10px}
-.statusbar.compact .sb-label{white-space:nowrap}
-.statusbar.setup.compact .sb-setup{max-height:0;opacity:0;overflow:hidden}
+
+/* ---- 帯の畳み込み（滑らか版）----
+   高さ：grid-template-rows 1fr→0fr（配置計算が軽い）
+   見た目：opacity と transform だけ（GPUで描ける。文字サイズや高さは直接動かさない） */
+.statusbar{position:relative;padding-bottom:6px}
+.hero-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows .34s cubic-bezier(.22,.61,.36,1)}
+.hero-inner{min-height:0;overflow:hidden;transition:opacity .22s ease,transform .34s cubic-bezier(.22,.61,.36,1)}
+.mini{position:absolute;left:14px;right:14px;top:max(10px,env(safe-area-inset-top));
+      display:flex;align-items:baseline;gap:6px;
+      background:var(--surface);border-radius:14px;padding:9px 14px;box-shadow:var(--lift);
+      opacity:0;transform:translateY(-6px);pointer-events:none;
+      transition:opacity .22s ease,transform .34s cubic-bezier(.22,.61,.36,1)}
+.mini-label{font-size:11px;font-weight:700;color:var(--ink-faint);letter-spacing:.06em}
+.mini-kcal{font-family:var(--num);font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+.mini-unit{font-size:11px;font-weight:700;color:var(--ink-soft)}
+.mini-date{margin-left:auto;font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.statusbar.over .mini-kcal{color:var(--danger)} .statusbar.tight .mini-kcal{color:var(--warn)}
+
+.statusbar.compact .hero-wrap{grid-template-rows:0fr}
+.statusbar.compact .hero-inner{opacity:0;transform:translateY(-8px)}
+.statusbar.compact .mini{opacity:1;transform:none;pointer-events:auto}
+/* 畳んだあと、1行ぶんの高さを確保する（miniは absolute なので） */
+.statusbar.compact{padding-bottom:calc(6px + 44px)}
+.statusbar.setup .mini-kcal,.statusbar.setup .mini-unit{display:none}
 @media (prefers-reduced-motion:reduce){
-  .statusbar,.statusbar .hero,.statusbar .ring,.statusbar .sb-macros,.statusbar .sb-foot,.statusbar .sb-num,.statusbar .sb-remain{transition:none}
+  .hero-wrap,.hero-inner,.mini{transition:none}
 }
