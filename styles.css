@@ -455,7 +455,7 @@ h2{font-family:var(--jp);font-size:13px;font-weight:900;letter-spacing:.06em;col
 .sb-setup{font-size:13px;color:var(--ink-soft);padding:4px 0 0;line-height:1.6}
 
 /* ---- 今日：カードと写真 ---- */
-.scroll{padding:10px 14px calc(var(--tab-h) + 96px)}
+.scroll{padding:10px 14px calc(var(--tab-h) + 28px)}
 .card{margin:0 0 18px}
 .slot{display:flex;align-items:center;gap:10px;padding:6px 4px 8px;border-bottom:none}
 .slot-name{font-family:var(--jp);font-size:13px;font-weight:900;letter-spacing:.06em;color:var(--ink)}
@@ -526,8 +526,12 @@ input[type=text],input[type=number],input[type=date],input[type=password],select
 .msg.err{border-radius:14px}
 .composer{border-top:none;background:var(--bg);padding:6px 14px calc(10px + var(--tab-h) + env(safe-area-inset-bottom))}
 #chat-input{border-radius:22px;background:var(--surface);box-shadow:var(--lift);padding:11px 16px}
-.icon-btn{display:none}   /* カメラは右下の大きなボタンに移した */
-.send-btn{border-radius:50%;width:42px;height:42px;background:var(--ink)}
+/* カメラは入力欄の左。右下に浮かせると送信ボタンや＋に重なって邪魔だった */
+.icon-btn{display:flex;width:44px;height:44px;border-radius:14px;border:none;background:var(--accent-deep);color:#fff;
+          box-shadow:0 6px 16px rgba(198,74,34,.28)}
+.icon-btn svg{width:22px;height:22px}
+.icon-btn:active{transform:scale(.95)}
+.send-btn{border-radius:14px;width:44px;height:44px;background:var(--ink)}
 
 /* 伝票：写真が上、量は指で */
 .propose{border:none;border-radius:18px;box-shadow:var(--lift-lg);padding:0;overflow:hidden;background:var(--surface)}

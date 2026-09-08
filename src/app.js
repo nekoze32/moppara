@@ -23,7 +23,6 @@ async function boot() {
 
   $$('#tabbar .tab').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go)));
   $('#statusbar').addEventListener('click', () => navigate('today'));
-  $('#fab').addEventListener('click', () => { if (current !== 'chat') navigate('chat'); $('#photo-input').click(); });
   $('#statusbar').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') navigate('today'); });
 
   onChange(() => {
@@ -139,7 +138,6 @@ function bindCollapse() {
 function navigate(name) {
   current = name;
   document.body.classList.toggle('onboarding', name === 'welcome');
-  $('#fab').hidden = !(name === 'chat' || name === 'today');
   for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
   for (const b of $$('#tabbar .tab')) b.classList.toggle('is-on', b.dataset.go === name);
   if (name === 'welcome') welcome.render();
