@@ -579,3 +579,24 @@ input[type=text],input[type=number],input[type=date],input[type=password],select
 .banner{border-radius:14px}
 details.acc{border:none;box-shadow:var(--lift);border-radius:18px}
 .toast{border-radius:14px}
+
+
+/* ---- 帯の畳み込み：下へスクロールで縮み、上へ戻れば開く ---- */
+.statusbar{transition:padding .28s cubic-bezier(.2,.7,.3,1)}
+.statusbar .hero{transition:padding .28s cubic-bezier(.2,.7,.3,1),border-radius .28s ease}
+.statusbar .ring{max-width:92px;max-height:92px;transition:max-width .28s cubic-bezier(.2,.7,.3,1),max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,margin .28s ease;overflow:hidden}
+.statusbar .sb-macros{max-height:48px;transition:max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,padding .28s ease;overflow:hidden}
+.statusbar .sb-foot{max-height:24px;transition:max-height .28s cubic-bezier(.2,.7,.3,1),opacity .18s ease,padding .28s ease;overflow:hidden}
+.statusbar .sb-num{transition:font-size .28s cubic-bezier(.2,.7,.3,1)}
+.statusbar .sb-remain{transition:margin .28s ease}
+.statusbar.compact{padding-bottom:4px}
+.statusbar.compact .hero{padding:8px 14px;border-radius:16px;align-items:center}
+.statusbar.compact .ring{max-width:0;max-height:0;opacity:0;margin-right:-14px}
+.statusbar.compact .sb-macros,.statusbar.compact .sb-foot{max-height:0;opacity:0;padding:0}
+.statusbar.compact .sb-num{font-size:22px}
+.statusbar.compact .hero-r{display:flex;align-items:baseline;gap:10px}
+.statusbar.compact .sb-label{white-space:nowrap}
+.statusbar.setup.compact .sb-setup{max-height:0;opacity:0;overflow:hidden}
+@media (prefers-reduced-motion:reduce){
+  .statusbar,.statusbar .hero,.statusbar .ring,.statusbar .sb-macros,.statusbar .sb-foot,.statusbar .sb-num,.statusbar .sb-remain{transition:none}
+}

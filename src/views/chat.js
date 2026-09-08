@@ -35,6 +35,11 @@ export function mount({ navigate, editMeal }) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); }
   });
 
+  // 入力中にログ側を触ったら、キーボードを閉じる（欄の外＝終えたい意図）
+  logEl.addEventListener('pointerdown', () => {
+    if (document.activeElement === inputEl) inputEl.blur();
+  }, { passive: true });
+
   restore();
   renderChips();
   paintDayNotice();

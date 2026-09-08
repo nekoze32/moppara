@@ -34,6 +34,7 @@ async function boot() {
   });
 
   paintStatusBar();
+  bindCollapse();
 
   if (state.storageError) {
     const w = $('#warnbar');
@@ -54,11 +55,44 @@ async function boot() {
     if (!document.hidden && state.realToday !== currentDay()) refresh();
   });
 
-  if (!hasKey()) navigate('welcome');
+  navigate(hasKey() ? 'chat' : 'welcome');   // 初回もここを通す。通さないとFABが出ない
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+/**
+ * 上部の帯は縦幅を取る。下へスクロールしたら畳み、上に戻れば開く。
+ * チャットは下寄せで scrollTop が動きにくいので、入力欄のフォーカスでも畳む。
+ * 40px で畳み 10px で開く（ヒステリシス）。境目で震えないため。
+ */
+function bindCollapse() {
+  const bar = $('#statusbar');
+  let byScroll = false, byFocus = false;
+  const apply = () => bar.classList.toggle('compact', byScroll || byFocus);
+
+  const watch = (node) => {
+    if (!node) return;
+    node.addEventListener('scroll', () => {
+      const y = node.scrollTop;
+      if (!byScroll && y > 40) { byScroll = true; apply(); }
+      else if (byScroll && y < 10) { byScroll = false; apply(); }
+    }, { passive: true });
+  };
+  for (const s of $$('.scroll')) watch(s);
+  watch($('#chat-log'));
+
+  const input = $('#chat-input');
+  input.addEventListener('focus', () => { byFocus = true; apply(); });
+  input.addEventListener('blur', () => { byFocus = false; apply(); });
+
+  // 画面を切り替えたら、その画面のスクロール位置で判定し直す
+  bar.__recheck = () => {
+    const cur = $('.screen:not([hidden]) .scroll') || $('#chat-log');
+    byScroll = !!cur && cur.scrollTop > 40;
+    apply();
+  };
 }
 
 function navigate(name) {
@@ -68,6 +102,7 @@ function navigate(name) {
   for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
   for (const b of $$('#tabbar .tab')) b.classList.toggle('is-on', b.dataset.go === name);
   if (name === 'welcome') welcome.render();
+  $('#statusbar').__recheck?.();
   if (name === 'today') today.render();
   if (name === 'trend') trend.render();
   if (name === 'settings') settings.render();
