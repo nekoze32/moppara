@@ -645,3 +645,19 @@ body.onboarding .statusbar{display:none}
 .mini-pfc .p .sbar b{background:var(--p)} .mini-pfc .f .sbar b{background:var(--f)} .mini-pfc .c .sbar b{background:var(--c)}
 .mini-pfc .over .sbar b{background:var(--danger)}
 .mini-pfc em{display:none}
+
+/* ---- 写真の入口シート：撮る／選ぶ ---- */
+.photo-sheet{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center}
+.ps-back{position:absolute;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(2px)}
+.ps-card{position:relative;width:100%;max-width:420px;margin:0 12px calc(12px + env(safe-area-inset-bottom));
+         background:var(--surface);border-radius:20px;box-shadow:var(--lift-lg);padding:6px;
+         animation:ps-up .18s cubic-bezier(.2,.7,.3,1)}
+@keyframes ps-up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.ps-card{animation:none}}
+.ps-item{display:flex;align-items:center;gap:12px;width:100%;padding:15px 14px;border-radius:15px;
+         background:transparent;font-size:15px;font-weight:700;color:var(--ink);text-align:left}
+.ps-item svg{width:22px;height:22px;flex:0 0 auto;color:var(--accent-deep)}
+.ps-item:active{background:var(--surface2)}
+.ps-item+.ps-item{border-top:1px solid var(--line)}
+.ps-cancel{width:100%;padding:13px 14px;margin-top:4px;border-radius:15px;background:var(--surface2);
+           font-size:14px;font-weight:700;color:var(--ink-soft)}
