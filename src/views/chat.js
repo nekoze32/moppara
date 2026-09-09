@@ -23,14 +23,7 @@ export function mount({ navigate, editMeal }) {
   previewEl = $('#attach-preview');
   previewImg = $('#attach-img');
 
-  // 撮る用・選ぶ用の2本とも同じ受け口に流す
   $('#photo-input').addEventListener('change', onPickPhoto);
-  $('#photo-input-lib').addEventListener('change', onPickPhoto);
-  $('#photo-btn').addEventListener('click', openPhotoSheet);
-  $('#ps-camera').addEventListener('click', () => pickFrom('#photo-input'));
-  $('#ps-library').addEventListener('click', () => pickFrom('#photo-input-lib'));
-  $('#ps-cancel').addEventListener('click', closePhotoSheet);
-  $('#photo-sheet-back').addEventListener('click', closePhotoSheet);
   $('#attach-clear').addEventListener('click', clearAttachment);
   sendBtn.addEventListener('click', send);
 
@@ -110,27 +103,6 @@ function greet() {
 }
 
 // ---------------------------------------------------------------- 入力
-
-// カメラボタンは直にカメラを開かない。撮るか、保存済みから選ぶかを先に聞く。
-function openPhotoSheet() {
-  $('#photo-sheet').hidden = false;
-  document.addEventListener('keydown', onSheetKey);
-}
-
-function closePhotoSheet() {
-  $('#photo-sheet').hidden = true;
-  document.removeEventListener('keydown', onSheetKey);
-}
-
-function onSheetKey(e) {
-  if (e.key === 'Escape') closePhotoSheet();
-}
-
-// シートを閉じてから開く。iOS はタップの流れの中でないと file input が開かない。
-function pickFrom(sel) {
-  closePhotoSheet();
-  $(sel).click();
-}
 
 async function onPickPhoto(e) {
   const file = e.target.files?.[0];

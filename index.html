@@ -82,12 +82,11 @@
         <button class="attach-x" id="attach-clear" aria-label="写真を外す">×</button>
       </div>
       <div class="composer-row">
-        <button type="button" class="icon-btn" id="photo-btn" aria-label="写真を撮る・選ぶ" aria-haspopup="true">
+        <label class="icon-btn" for="photo-input" aria-label="写真を撮る・選ぶ">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-        </button>
-        <!-- 撮る用（capture 付き）と、選ぶ用（capture 無し）の2本。どちらも onPickPhoto が受ける -->
-        <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
-        <input type="file" id="photo-input-lib" accept="image/*" hidden>
+        </label>
+        <!-- capture は付けない。付けるとカメラに直行して、保存済みの写真を選べない -->
+        <input type="file" id="photo-input" accept="image/*" hidden>
         <textarea id="chat-input" rows="1" placeholder="写真か、ひとこと"></textarea>
         <button class="send-btn" id="send-btn" aria-label="送信">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.6 21 12 3.4 3.4 3.4 10.2 14 12 3.4 13.8z" fill="currentColor"/></svg>
@@ -119,22 +118,6 @@
   <button class="tab" data-go="trend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.5-5 3.5 3 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>推移</span></button>
   <button class="tab" data-go="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>設定</span></button>
 </nav>
-
-<!-- 写真の入口：撮るか選ぶかを、OSのシートに任せず自分で聞く -->
-<div class="photo-sheet" id="photo-sheet" hidden>
-  <div class="ps-back" id="photo-sheet-back"></div>
-  <div class="ps-card" role="dialog" aria-modal="true" aria-label="写真">
-    <button type="button" class="ps-item" id="ps-camera">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-      写真を撮る
-    </button>
-    <button type="button" class="ps-item" id="ps-library">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.5h17v13h-17z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 15l4.5-4 3.5 3 3-2.5 6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="8.5" cy="9.5" r="1.4" fill="currentColor"/></svg>
-      写真を選ぶ
-    </button>
-    <button type="button" class="ps-cancel" id="ps-cancel">やめる</button>
-  </div>
-</div>
 
 <div class="toast" id="toast" hidden></div>
 
