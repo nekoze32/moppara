@@ -645,3 +645,61 @@ body.onboarding .statusbar{display:none}
 .mini-pfc .p .sbar b{background:var(--p)} .mini-pfc .f .sbar b{background:var(--f)} .mini-pfc .c .sbar b{background:var(--c)}
 .mini-pfc .over .sbar b{background:var(--danger)}
 .mini-pfc em{display:none}
+
+
+/* ---- 帯をタップして開く内訳シート ----------------------------------------
+   上限や目標の数字が「どこから来たのか」を置く場所。画面を移動せずに見て閉じる。 */
+.sheet-wrap{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
+            background:rgba(30,27,24,0);transition:background .22s ease}
+.sheet-wrap.on{background:rgba(30,27,24,.42)}
+.sheet{width:100%;max-width:520px;max-height:88dvh;overflow:auto;-webkit-overflow-scrolling:touch;
+       background:var(--surface);border-radius:22px 22px 0 0;
+       padding:8px 18px calc(18px + env(safe-area-inset-bottom));
+       box-shadow:0 -12px 40px rgba(30,27,24,.18);
+       transform:translateY(24px);opacity:0;
+       transition:transform .24s cubic-bezier(.2,.7,.3,1),opacity .18s ease}
+.sheet-wrap.on .sheet{transform:none;opacity:1}
+@media (prefers-reduced-motion:reduce){
+  .sheet,.sheet-wrap{transition:none}
+  .sheet{transform:none;opacity:1}
+}
+.sheet-grip{width:38px;height:4px;border-radius:2px;background:var(--line2);margin:6px auto 12px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet-head h2{margin:0;font-size:17px;font-weight:900;letter-spacing:.01em}
+.sheet-x{border:none;background:none;color:var(--ink-faint);font-size:16px;
+         width:34px;height:34px;border-radius:11px;flex:0 0 auto}
+.sheet-x:active{background:var(--surface2)}
+
+.d-top{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.d-top > div{background:var(--surface2);border-radius:14px;padding:10px 6px;text-align:center}
+.d-top em{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--ink-faint);margin-bottom:2px}
+.d-top b{font-family:var(--num);font-size:19px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.d-top .over b{color:var(--danger)}
+
+.d-sec{margin-top:20px}
+.d-sec > h3{margin:0 0 6px;font-size:11.5px;font-weight:900;letter-spacing:.06em;color:var(--ink-faint)}
+.d-row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:6px 0;font-size:13.5px}
+.d-row > span{color:var(--ink-soft);line-height:1.45}
+.d-row > b{font-family:var(--num);font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.d-row.muted > span,.d-row.muted > b{color:var(--ink-faint);font-weight:600}
+.d-row.ex > b{color:var(--ok)}
+.d-row.sum{border-top:1px solid var(--line);margin-top:5px;padding-top:9px}
+.d-row.sum > span{color:var(--ink);font-weight:700}
+.d-row.sum > b{font-size:17px}
+.d-row.total > b{color:var(--accent-deep);font-size:21px}
+
+.d-note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--warn-soft);
+        font-size:12.5px;line-height:1.65;color:var(--ink-soft)}
+
+.d-mac{padding:8px 0;border-bottom:1px solid var(--line)}
+.d-mac:last-child{border-bottom:none}
+.d-mac-h{display:flex;align-items:baseline;gap:7px;font-size:13.5px}
+.d-mac-h > span{color:var(--ink);font-weight:700}
+.d-mac-h > b{margin-left:auto;font-family:var(--num);font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.d-mac-h > em{font-style:normal;font-weight:800;font-size:12.5px;color:var(--danger);font-family:var(--num)}
+.d-mac-h .dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;align-self:center}
+.d-mac-h .dot.p{background:var(--p)} .d-mac-h .dot.f{background:var(--f)} .d-mac-h .dot.c{background:var(--c)}
+.d-mac-s{margin-top:3px;padding-left:16px;font-size:12px;color:var(--ink-faint)}
+
+.d-foot{display:flex;gap:8px;margin-top:20px}
+.d-foot .btn{flex:1;padding:11px 12px;font-size:13.5px}

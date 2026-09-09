@@ -8,6 +8,7 @@ import * as chat from './views/chat.js';
 import * as today from './views/today.js';
 import * as trend from './views/trend.js';
 import * as settings from './views/settings.js';
+import * as detail from './views/detail.js';
 
 let current = 'chat';
 
@@ -20,13 +21,18 @@ async function boot() {
   today.mount({ navigate });
   trend.mount();
   settings.mount();
+  detail.mount({ navigate });
 
   $$('#tabbar .tab').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.go)));
-  $('#statusbar').addEventListener('click', () => navigate('today'));
-  $('#statusbar').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') navigate('today'); });
+  // 帯をタップしたら内訳を出す。数字の作り方が見えないと、設定を変えた意味が分からない。
+  $('#statusbar').addEventListener('click', () => detail.open());
+  $('#statusbar').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); detail.open(); }
+  });
 
   onChange(() => {
     paintStatusBar();
+    detail.onDataChanged();
     chat.onDataChanged();
     if (current === 'today') today.render();
     if (current === 'trend') trend.render();

@@ -19,7 +19,7 @@
 <body>
 
 <!-- ===== 常時見える残量バー ===== -->
-<header id="statusbar" class="statusbar" role="button" tabindex="0" aria-label="今日の残量。タップで今日の画面へ">
+<header id="statusbar" class="statusbar" role="button" tabindex="0" aria-label="今日の残量。タップで内訳を見る">
   <!-- 畳んだときに見える1行。常に置いておき、透明度と位置だけを動かす -->
   <div class="mini" id="sb-mini" aria-hidden="true">
     <span class="mini-label" id="mini-label">残り</span>
@@ -118,6 +118,9 @@
   <button class="tab" data-go="trend"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16l4.5-5 3.5 3 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>推移</span></button>
   <button class="tab" data-go="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>設定</span></button>
 </nav>
+
+<!-- 帯をタップすると開く内訳 -->
+<div class="sheet-wrap" id="sheet" hidden></div>
 
 <div class="toast" id="toast" hidden></div>
 
