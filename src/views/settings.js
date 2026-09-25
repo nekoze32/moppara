@@ -1,7 +1,7 @@
 // 設定。今日タブと同じ流儀で「いまの値＋修正」を出し、直すときだけ欄が開く。
 // 入力欄を出しっぱなしにして黙って保存すると、入れた側は反映されたか分からない。
 
-import { $, el, toast, r1, fmt } from '../util.js';
+import { $, el, toast, r1, fmt, hhmm } from '../util.js';
 import * as db from '../db.js';
 import { state, saveSettings, refresh } from '../store.js';
 import { ACTIVITY_LEVELS, dailyBudget, macroTargets, activityFactor } from '../nutrition.js';
@@ -309,7 +309,8 @@ function sectionData() {
   const box = el('div', { class: 'card' });
   box.append(el('h2', {}, 'データ'));
   box.append(el('div', { class: 'hint', style: 'margin:8px 0 10px' },
-    '記録はこの端末の中だけにあります。ときどき書き出してください。'));
+    '記録はこの端末の中だけにあります。ときどき書き出してください。',
+    lastExportText()));
 
   const diag = el('div', { class: 'card tight', style: 'margin:0 0 12px' }, '確認中…');
   box.append(diag);
@@ -333,6 +334,7 @@ function sectionData() {
 
   box.append(el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
     el('button', { class: 'btn sm', onclick: doExport }, '書き出す (JSON)'),
+    el('button', { class: 'btn sm', onclick: doExportCsv }, '表計算用 (CSV)'),
     el('label', { class: 'btn sm', for: 'import-file' }, '読み込む'),
     el('button', { class: 'btn sm danger', onclick: doWipe }, '全部消す')));
   const fileIn = el('input', { type: 'file', id: 'import-file', accept: 'application/json', hidden: true });
@@ -377,13 +379,60 @@ function num(value, step = '1') {
   return el('input', { type: 'number', inputmode: 'decimal', step, value: value ?? '' });
 }
 
-async function doExport() {
+const LAST_EXPORT = 'moppara-last-export';
+
+/** 最後に書き出してから何日たったか。一度も無ければ null。 */
+export function daysSinceExport() {
+  try {
+    const t = localStorage.getItem(LAST_EXPORT);
+    return t ? Math.floor((Date.now() - Date.parse(t)) / 86400000) : null;
+  } catch { return null; }
+}
+
+function lastExportText() {
+  const d = daysSinceExport();
+  return d == null ? '（まだ一度も書き出していません）' : d === 0 ? '（今日書き出し済み）' : `（最後に書き出したのは${d}日前）`;
+}
+
+/**
+ * ファイルを端末に置く。iPhoneのホーム画面アプリでは download 属性が効かず画面が差し替わるだけなので、
+ * 共有シートが使えるならそちらで「ファイルに保存」させる。
+ */
+async function saveFile(name, blob, type) {
+  const file = new File([blob], name, { type });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return true; }
+    catch (e) { if (e.name === 'AbortError') return false; /* 共有が使えなければ下へ */ }
+  }
+  const a = el('a', { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a); a.click(); a.remove();
+  return true;
+}
+
+export async function doExport() {
   const data = await db.exportAll();
   if (data.settings) data.settings = { ...data.settings, geminiKey: '', anthropicKey: '' };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = el('a', { href: URL.createObjectURL(blob), download: `moppara-${new Date().toISOString().slice(0, 10)}.json` });
-  document.body.append(a); a.click(); a.remove();
+  const ok = await saveFile(`moppara-${new Date().toISOString().slice(0, 10)}.json`, blob, 'application/json');
+  if (!ok) return;
+  try { localStorage.setItem(LAST_EXPORT, new Date().toISOString()); } catch { /* 記録できなくても書き出しは済んでいる */ }
   toast('書き出しました（APIキーは含みません）');
+  if (root?.isConnected) render();
+}
+
+/** 品目ごとに1行。Excelで文字化けしないようBOMを付ける。 */
+async function doExportCsv() {
+  const [meals, weights] = await Promise.all([db.allMeals(), db.allWeights()]);
+  const wmap = new Map(weights.map((w) => [w.day, w.kg]));
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['日付', '時刻', '区分', '品名', '分量', 'kcal', 'P', 'F', 'C', 'その日の体重'].join(',')];
+  for (const m of meals) {
+    for (const i of m.items || []) {
+      lines.push([m.day, hhmm(m.at), m.slot, q(i.name), q(i.amount), i.kcal, i.p, i.f, i.c, wmap.get(m.day) ?? ''].join(','));
+    }
+  }
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv' });
+  if (await saveFile(`moppara-${new Date().toISOString().slice(0, 10)}.csv`, blob, 'text/csv')) toast('CSVを書き出しました');
 }
 
 async function doImport(e) {

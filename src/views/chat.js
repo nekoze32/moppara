@@ -91,7 +91,7 @@ function dayLabel(iso) {
 function greet() {
   const lines = state.ready
     ? ['こんにちは。食べたものを写真か一言で送ってください。', '',
-       '  ・写真を撮る（撮ればそのまま解析します）',
+       '  ・写真を撮る（撮ればそのまま解析します。成分表示の写真も読めます）',
        '  ・「かけそばとおにぎり1個」',
        '  ・「体重72.4」「30分走った」',
        '  ・「今夜の外食どこがいい？」', '',
@@ -105,14 +105,16 @@ function greet() {
 // ---------------------------------------------------------------- 入力
 
 async function onPickPhoto(e) {
-  const file = e.target.files?.[0];
+  // 料理と成分表示、定食の皿を分けて撮った、など1食で数枚になることがある。4枚まで1回で送る
+  const files = [...(e.target.files || [])].slice(0, 4);
   e.target.value = '';
-  if (!file) return;
+  if (!files.length) return;
   try {
-    const dataUrl = await shrinkImage(file, 800, 0.72);
+    const urls = [];
+    for (const f of files) urls.push(await shrinkImage(f, 800, 0.72));
     // 撮ったらそのまま解析する。「送信」を挟むと1タップ増えるだけ。
     clearAttachment();
-    await sendWith('', dataUrl);
+    await sendWith('', urls.length === 1 ? urls[0] : urls);
   } catch (err) {
     toast(err.message || '写真を読めませんでした');
   }
@@ -197,10 +199,12 @@ async function sendWith(text, img) {
     goTab('settings');
     return;
   }
-  const thumb = img ? await thumbnail(img) : null;
-  logEl.append(userBubble(text, thumb));
+  const pics = [].concat(img || []);
+  const thumb = pics.length ? await thumbnail(pics[0]) : null;
+  const shown = text || (pics.length > 1 ? `（写真${pics.length}枚）` : '（写真）');
+  logEl.append(userBubble(shown, thumb));
   scrollDown();
-  await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'user', text: text || '（写真）', thumb });
+  await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'user', text: shown, thumb });
   await deliver(text, img, thumb);
 }
 
@@ -216,8 +220,11 @@ async function deliver(text, img, thumb = null) {
 
   try {
     const recent = await recentDays(14);
-    const context = contextBlock({ presets: state.presets, recent });
-    const history = (await db.allChat()).slice(-9, -1)
+    const rowsNow = await db.allChat();
+    // 直前に出した伝票がまだ確定していなければ、それを見せて「ご飯は半分」のような訂正を受けられるようにする
+    const pendingRow = rowsNow.slice(-6).reverse().find((r) => r.role === 'proposal' && r.status === 'pending') || null;
+    const context = contextBlock({ presets: state.presets, recent, pending: pendingRow?.meal });
+    const history = rowsNow.slice(-9, -1)
       .filter((r) => r.role === 'user' || r.role === 'assistant')
       .map((r) => ({ role: r.role, text: r.text }));
 
@@ -275,10 +282,16 @@ async function deliver(text, img, thumb = null) {
       // 「＋ 夜」から来たなら、その区分を優先する（AIは時刻から推測しているだけ）
       const reserved = takeSlot();
       if (reserved) out.meal.slot = reserved;
+      // 訂正なら古い伝票を下ろし、写真はそちらから引き継ぐ（訂正の発話に写真は付かない）
+      const revising = out.revise && pendingRow;
+      if (revising) {
+        await db.putChat({ ...pendingRow, status: 'revised' });
+        logEl.querySelector(`[data-row="${pendingRow.id}"]`)?.replaceWith(revisedNote());
+      }
       // DOMだけに置くと開き直したとき消えて「記録済み」に見える。DBに持つ。
       const row = {
         id: uid(), at: new Date().toISOString(), role: 'proposal',
-        text: '', status: 'pending', meal: out.meal, thumb, mealId: null,
+        text: '', status: 'pending', meal: out.meal, thumb: thumb || (revising ? pendingRow.thumb : null), mealId: null,
       };
       await db.putChat(row);
       logEl.append(proposeCard(row));
@@ -340,10 +353,11 @@ async function thumbnail(dataUrl, px = 220) {
 function proposeCard(row) {
   if (row.status === 'saved') return savedCard(row);
   if (row.status === 'cancelled') return el('div', { class: 'msg sys' }, '記録しませんでした');
+  if (row.status === 'revised') return revisedNote();
 
   const meal = row.meal;
   const items = meal.items.map((i) => ({ ...i, b: { kcal: i.kcal || 1, p: i.p, f: i.f, c: i.c } }));
-  const card = el('div', { class: 'propose' });
+  const card = el('div', { class: 'propose', 'data-row': row.id });
 
   // 写真があれば上いっぱいに。kcalは写真の上に載せる
   const badge = el('b');
@@ -401,6 +415,7 @@ function proposeCard(row) {
   recalc();
 
   if (meal.assumptions?.length) card.append(el('div', { class: 'p-assume' }, '仮定：' + meal.assumptions.join(' / ')));
+  card.append(el('div', { class: 'p-assume' }, '違っていたら「ご飯は半分」「味噌汁なし」と送れば直ります'));
 
   const actions = el('div', { class: 'p-actions' });
   actions.append(
@@ -429,6 +444,8 @@ function proposeCard(row) {
   card.append(actions);
   return card;
 }
+
+const revisedNote = () => el('div', { class: 'msg sys' }, '伝票を直しました（下が新しいもの）');
 
 /** 記録済み。ここでは数字を触らせない（触れてもDBは変わらないため）。 */
 function savedCard(row) {

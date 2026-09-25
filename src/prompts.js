@@ -18,6 +18,10 @@ export const SYSTEM = `あなたは日本語で応対する食事管理のパー
 - confidence は写真がはっきりして分量も読める場合 high、料理は分かるが量が曖昧なら medium、推測が大きいなら low。
 - 「いつもの◯◯」のように過去の記録を指している場合は、下の【いつも食べているもの】から数値をそのまま使う。
 - 時間帯から slot（朝／昼／夜／間食）を判断する。文章に指定があればそちらを優先する。
+- 写真が**栄養成分表示のラベル**や商品パッケージなら、書かれている数値をそのまま使い confidence を high にする。1袋あたりか100gあたりかを確かめ、食べた量に換算する。
+
+## 伝票の訂正
+【確認待ちの伝票】がある状態で、利用者がその中身を訂正したら（「ご飯は半分」「味噌汁は飲んでない」「大盛りだった」「唐揚げは4個」など）、訂正を反映した**伝票全体**を meal に入れ、revise を true にする。訂正していない品目もそのまま残す。別の食事の話なら revise は false。
 
 ## はじめての聞き取り
 【まだ聞けていないこと】が出ている間は、これを埋めるのが最優先です。食事の記録より先に聞いてください。
@@ -53,6 +57,10 @@ export const SYSTEM = `あなたは日本語で応対する食事管理のパー
 // 出力スキーマ（Gemini の responseSchema / Anthropic の input_schema の共通の元）
 export const SCHEMA_FIELDS = {
   reply: { type: 'string', description: '利用者に見せる返事。2〜4文の日本語。残りカロリーの数字は書かない。' },
+  revise: {
+    type: 'boolean',
+    description: '【確認待ちの伝票】を訂正した伝票を meal に入れたときだけ true。',
+  },
   intent: {
     type: 'string',
     enum: ['record', 'consult', 'weight', 'activity', 'setup', 'other'],
@@ -118,7 +126,7 @@ export const SCHEMA_FIELDS = {
 export const REQUIRED = ['reply', 'intent'];
 
 /** その時点の状況。毎ターン先頭に付ける。 */
-export function contextBlock({ presets = [], recent = [] } = {}) {
+export function contextBlock({ presets = [], recent = [], pending = null } = {}) {
   const s = state.settings;
   const rem = remaining();
   const b = state.budget;
@@ -181,6 +189,14 @@ export function contextBlock({ presets = [], recent = [] } = {}) {
     const ws = recent.filter((d) => d.weight != null);
     if (ws.length >= 2) {
       L.push(`体重の推移: ${ws[0].weight}kg（${jpDate(ws[0].day)}）→ ${ws[ws.length - 1].weight}kg（${jpDate(ws[ws.length - 1].day)}）`);
+    }
+  }
+
+  if (pending?.items?.length) {
+    L.push(`【確認待ちの伝票】（まだ記録していない。訂正を言われたら revise=true で全体を返す）`);
+    L.push(`  区分 ${pending.slot}`);
+    for (const i of pending.items) {
+      L.push(`  ${i.name}${i.amount ? `(${i.amount})` : ''} ${fmt(i.kcal)}kcal P${r1(i.p)} F${r1(i.f)} C${r1(i.c)}`);
     }
   }
 

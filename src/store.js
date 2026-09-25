@@ -193,3 +193,16 @@ export async function recentDays(n = 14) {
   }
   return out;
 }
+
+/**
+ * 何日続けて記録しているか。今日がまだ空でも、昨日まで続いていれば途切れていない扱いにする
+ * （朝いちばんに「0日」と出すと、それだけでやる気が落ちる）。
+ */
+export async function streakDays() {
+  const days = new Set((await db.allMeals().catch(() => [])).map((m) => m.day));
+  let d = state.realToday;
+  if (!days.has(d)) d = addDays(d, -1);
+  let n = 0;
+  while (days.has(d)) { n++; d = addDays(d, -1); }
+  return { days: n, todayDone: days.has(state.realToday) };
+}

@@ -3,8 +3,9 @@
 
 import { $, el, fmt, r0, r1, hhmm, uid, toast, undoToast, sumItems, jpDate, addDays } from '../util.js';
 import * as db from '../db.js';
-import { state, refresh, currentDay, targetDay, setViewDay, goToday, weightKg, recentMeals, noteRecord, remaining } from '../store.js';
+import { state, refresh, currentDay, targetDay, setViewDay, goToday, weightKg, recentMeals, noteRecord, remaining, streakDays } from '../store.js';
 import { reserveSlot } from './chat.js';
+import { doExport, daysSinceExport } from './settings.js';
 
 /** 過去日へ書くときは、その日の同じ時刻にする（時刻順の並びを崩さない）。 */
 function stampFor(day) {
@@ -37,9 +38,30 @@ export function render() {
   }
 
   root.append(dateNav(), momentCard(), sectionMeals(), sectionWeight(), sectionActivity());
+  backupNudge();
   if (state.presets.length) root.append(sectionPresets());
   root.append(el('div', { class: 'faint', style: 'padding:4px 0 8px' },
     '行をタップすると直せます。'));
+}
+
+/**
+ * 記録は端末にしか無い。2週間書き出していなければ一度だけ下に出す。
+ * 消えてから気づいても戻せないので、黙っていない。
+ */
+function backupNudge() {
+  const since = daysSinceExport();
+  if (since != null && since < 14) return;
+  const slot = el('div');
+  root.append(slot);
+  db.allMeals().then((ms) => {
+    if (!ms.length) return;
+    const firstDay = ms.reduce((a, m) => (m.day < a ? m.day : a), ms[0].day);
+    const kept = Math.round((Date.parse(currentDay()) - Date.parse(firstDay)) / 86400000);
+    if (since == null && kept < 14) return;
+    slot.append(el('div', { class: 'banner' },
+      since == null ? `${kept}日分の記録が、この端末の中だけにあります。` : `最後に書き出してから${since}日たちました。`,
+      el('div', {}, el('button', { class: 'btn sm primary', onclick: doExport }, 'いま書き出す'))));
+  });
 }
 
 // ---------------------------------------------------------------- 献立
@@ -64,9 +86,16 @@ function momentCard() {
 /** 前後の日へ。昨日の食べ忘れを翌朝入れる、が一番ありがちな場面。 */
 function dateNav() {
   // 子は el() に渡す。生の append は null を文字列 "null" にする（2回踏んだ）
+  const streak = el('span', { class: 'dn-streak' });
+  if (state.isToday) {
+    streakDays().then(({ days, todayDone }) => {
+      if (days < 2) return;
+      streak.textContent = todayDone ? `${days}日連続` : `${days}日連続中。今日の分で${days + 1}日`;
+    });
+  }
   return el('div', { class: 'datenav' },
     el('button', { class: 'dn-btn', onclick: () => setViewDay(addDays(state.today, -1)) }, '‹'),
-    el('span', { class: 'dn-day' }, state.isToday ? `今日　${jpDate(state.today)}` : jpDate(state.today)),
+    el('span', { class: 'dn-day' }, state.isToday ? `今日　${jpDate(state.today)}` : jpDate(state.today), streak),
     el('button', { class: 'dn-btn', disabled: state.isToday, onclick: () => setViewDay(addDays(state.today, 1)) }, '›'),
     state.isToday ? null : el('button', { class: 'btn sm', onclick: () => goToday() }, '今日へ'));
 }
@@ -106,6 +135,30 @@ function sectionMeals() {
  */
 function addPanel(slot) {
   const panel = el('div', { class: 'addpanel' });
+
+  // 朝は毎日ほぼ同じ、という人が多い。前日の同じ区分を丸ごと写せるようにする
+  const prevDay = addDays(state.today, -1);
+  const copyBox = el('div');
+  panel.append(copyBox);
+  db.mealsOf(prevDay).then((ms) => {
+    const rows = ms.filter((m) => m.slot === slot);
+    if (!rows.length) return;
+    const t = sumItems(rows.flatMap((m) => m.items));
+    copyBox.append(el('button', {
+      class: 'btn sm', style: 'width:100%;margin-bottom:6px',
+      onclick: async () => {
+        const ids = [];
+        for (const m of rows) {
+          const id = uid(); ids.push(id);
+          await db.putMeal({ id, day: targetDay(), at: stampFor(targetDay()), slot, items: structuredClone(m.items), thumb: m.thumb || null, source: 'copy' });
+        }
+        openSlot = null;
+        noteRecord(`前日の${slot}`, t.kcal, t.p);
+        await refresh();
+        undoToast(`前日の${slot}（${fmt(t.kcal)} kcal）を写しました`, async () => { for (const id of ids) await db.delMeal(id); await refresh(); });
+      },
+    }, `前日の${slot}をそのまま（${fmt(t.kcal)} kcal）`));
+  });
 
   const recentBox = el('div', { class: 'ap-recent' });
   panel.append(el('div', { class: 'ap-label' }, 'よく食べるもの'), recentBox);

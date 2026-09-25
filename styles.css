@@ -703,3 +703,8 @@ body.onboarding .statusbar{display:none}
 
 .d-foot{display:flex;gap:8px;margin-top:20px}
 .d-foot .btn{flex:1;padding:11px 12px;font-size:13.5px}
+
+/* 連続記録。日付の下に小さく。数字で煽らない */
+.dn-day{display:flex;flex-direction:column;align-items:center;gap:1px}
+.dn-streak{font-family:var(--sans, inherit);font-size:11.5px;font-weight:500;color:var(--ink-faint)}
+.dn-streak:empty{display:none}
