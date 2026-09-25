@@ -199,7 +199,7 @@ export async function recentDays(n = 14) {
  * （朝いちばんに「0日」と出すと、それだけでやる気が落ちる）。
  */
 export async function streakDays() {
-  const days = new Set((await db.allMeals().catch(() => [])).map((m) => m.day));
+  const days = new Set(await db.mealDays().catch(() => []));
   let d = state.realToday;
   if (!days.has(d)) d = addDays(d, -1);
   let n = 0;

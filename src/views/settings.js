@@ -1,7 +1,7 @@
 // 設定。今日タブと同じ流儀で「いまの値＋修正」を出し、直すときだけ欄が開く。
 // 入力欄を出しっぱなしにして黙って保存すると、入れた側は反映されたか分からない。
 
-import { $, el, toast, r1, fmt, hhmm } from '../util.js';
+import { $, el, toast, r1, fmt, hhmm, ymd } from '../util.js';
 import * as db from '../db.js';
 import { state, saveSettings, refresh } from '../store.js';
 import { ACTIVITY_LEVELS, dailyBudget, macroTargets, activityFactor } from '../nutrition.js';
@@ -404,25 +404,40 @@ function lastExportText() {
 /**
  * ファイルを端末に置く。iPhoneのホーム画面アプリでは download 属性が効かず画面が差し替わるだけなので、
  * 共有シートが使えるならそちらで「ファイルに保存」させる。
+ * 共有シートはタップの直後でないと断られる（中身を作る待ち時間で切れる）。断られたら作った物を取っておき、
+ * もう一度押してもらう。2回目は待ち時間が無いので通る。
  */
+let prepared = null;   // {name, file}
 async function saveFile(name, blob, type) {
-  const file = new File([blob], name, { type });
+  const file = prepared?.name === name ? prepared.file : new File([blob], name, { type });
+  prepared = null;
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file] }); return true; }
-    catch (e) { if (e.name === 'AbortError') return false; /* 共有が使えなければ下へ */ }
+    try { await navigator.share({ files: [file] }); return 'shared'; }
+    catch (e) {
+      if (e.name === 'AbortError') return false;
+      if (e.name === 'NotAllowedError') { prepared = { name, file }; toast('準備できました。もう一度押すと保存先を選べます'); return false; }
+    }
   }
-  const a = el('a', { href: URL.createObjectURL(blob), download: name });
+  const a = el('a', { href: URL.createObjectURL(file), download: name });
   document.body.append(a); a.click(); a.remove();
-  return true;
+  // ホーム画面アプリの download は効かないことがある。書き出せたとは言い切れないので記録しない
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  return standalone ? 'unsure' : 'downloaded';
 }
 
 export async function doExport() {
-  const data = await db.exportAll();
-  if (data.settings) data.settings = { ...data.settings, geminiKey: '', anthropicKey: '' };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const ok = await saveFile(`moppara-${new Date().toISOString().slice(0, 10)}.json`, blob, 'application/json');
-  if (!ok) return;
-  try { localStorage.setItem(LAST_EXPORT, new Date().toISOString()); } catch { /* 記録できなくても書き出しは済んでいる */ }
+  const name = `moppara-${ymd()}.json`;
+  let blob = null;
+  if (prepared?.name !== name) {
+    const data = await db.exportAll();
+    if (data.settings) data.settings = { ...data.settings, geminiKey: '', anthropicKey: '' };
+    blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  }
+  const r = await saveFile(name, blob, 'application/json');
+  if (!r) return;
+  if (r !== 'unsure') {
+    try { localStorage.setItem(LAST_EXPORT, new Date().toISOString()); } catch { /* 記録できなくても書き出しは済んでいる */ }
+  }
   toast('書き出しました（APIキーは含みません）');
   if (root?.isConnected) render();
 }
@@ -439,7 +454,7 @@ async function doExportCsv() {
     }
   }
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv' });
-  if (await saveFile(`moppara-${new Date().toISOString().slice(0, 10)}.csv`, blob, 'text/csv')) toast('CSVを書き出しました');
+  if (await saveFile(`moppara-${ymd()}.csv`, blob, 'text/csv')) toast('CSVを書き出しました');
 }
 
 async function doImport(e) {
@@ -450,6 +465,12 @@ async function doImport(e) {
     const data = JSON.parse(await file.text());
     const replace = confirm('いまのデータを置き換えますか。\n［OK］置き換える　／　［キャンセル］今のデータに足す');
     await db.importAll(data, { replace });
+    // 設定は saveSettings を通す（控えも更新される）。書き出したファイルにキーは無いので、いまのキーは残す
+    if (data.settings) {
+      const s = state.settings;
+      await saveSettings({ ...data.settings, geminiKey: s.geminiKey, anthropicKey: s.anthropicKey,
+        provider: (data.settings.provider === 'anthropic' ? s.anthropicKey : s.geminiKey) ? data.settings.provider : s.provider });
+    }
     await refresh();
     render();
     toast('読み込みました');

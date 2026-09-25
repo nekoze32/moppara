@@ -1,7 +1,7 @@
 // チャット。ここが全ての入口：写真・一言の記録も、体重も、運動も、相談も。
 // 推定の伝票は DOM でなく DB に持つ（開き直すと消えて「記録済みに見える」ため）。
 
-import { $, el, uid, toast, undoToast, shrinkImage, sumItems, fmt, r1 } from '../util.js';
+import { $, el, uid, toast, undoToast, shrinkImage, sumItems, fmt, r1, mealDay, addDays } from '../util.js';
 import * as db from '../db.js';
 import { state, refresh, currentDay, targetDay, goToday, recentDays, recentMeals, hasKey, applySetup, noteRecord } from '../store.js';
 import { ask, AIError } from '../ai.js';
@@ -69,7 +69,7 @@ async function restore() {
   if (!rows.length) { greet(); return; }
   let lastDay = '';
   for (const r of rows) {
-    const day = r.at.slice(0, 10);
+    const day = mealDay(new Date(r.at), state.settings.dayCutoffHour);   // at はUTC。切り出すと朝9時前が前日に入る
     if (day !== lastDay) { logEl.append(el('div', { class: 'msg sys' }, dayLabel(day))); lastDay = day; }
     if (r.role === 'user') logEl.append(userBubble(r.text, r.thumb));
     else if (r.role === 'proposal') logEl.append(proposeCard(r));   // 未確定も確定済みも復元する
@@ -78,14 +78,12 @@ async function restore() {
   scrollDown();
 }
 
-function dayLabel(iso) {
-  const d = new Date(iso + 'T00:00:00');
-  const t = new Date();
-  const same = (a, b) => a.toDateString() === b.toDateString();
-  if (same(d, t)) return '今日';
-  const y = new Date(t); y.setDate(y.getDate() - 1);
-  if (same(d, y)) return '昨日';
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
+function dayLabel(day) {
+  const today = currentDay();
+  if (day === today) return '今日';
+  if (day === addDays(today, -1)) return '昨日';
+  const [, m, d] = day.split('-').map(Number);
+  return `${m}月${d}日`;
 }
 
 function greet() {
@@ -109,6 +107,7 @@ async function onPickPhoto(e) {
   const files = [...(e.target.files || [])].slice(0, 4);
   e.target.value = '';
   if (!files.length) return;
+  if (busy) { toast('前の返事を待っています。届いてから撮り直してください'); return; }
   try {
     const urls = [];
     for (const f of files) urls.push(await shrinkImage(f, 800, 0.72));
@@ -192,13 +191,19 @@ async function send() {
 }
 
 async function sendWith(text, img) {
-  if (busy) return;
+  // 返事待ちの間に送られたものを黙って捨てない。文字は欄に戻す
+  if (busy) {
+    if (text && !inputEl.value) inputEl.value = text;
+    toast('前の返事を待っています。届いてから送ってください');
+    return;
+  }
   if (!hasKey()) {
     logEl.append(el('div', { class: 'msg err' }, 'APIキーがまだ設定されていません。設定タブで入れてください。'));
     scrollDown();
     goTab('settings');
     return;
   }
+  setBusy(true);   // 縮小と保存を待つ間に2通目が通らないよう、ここで立てる
   const pics = [].concat(img || []);
   const thumb = pics.length ? await thumbnail(pics[0]) : null;
   const shown = text || (pics.length > 1 ? `（写真${pics.length}枚）` : '（写真）');
@@ -283,7 +288,9 @@ async function deliver(text, img, thumb = null) {
       const reserved = takeSlot();
       if (reserved) out.meal.slot = reserved;
       // 訂正なら古い伝票を下ろし、写真はそちらから引き継ぐ（訂正の発話に写真は付かない）
-      const revising = out.revise && pendingRow;
+      // 待っている間に古い伝票が記録・取り消しされていたら、訂正ではなく新しい伝票として出す
+      const stillPending = pendingRow && (await db.allChat()).find((r) => r.id === pendingRow.id)?.status === 'pending';
+      const revising = out.revise && stillPending;
       if (revising) {
         await db.putChat({ ...pendingRow, status: 'revised' });
         logEl.querySelector(`[data-row="${pendingRow.id}"]`)?.replaceWith(revisedNote());
@@ -306,7 +313,10 @@ async function deliver(text, img, thumb = null) {
       : err.message || '不明なエラーです。';
     const again = el('button', { class: 'btn sm', style: 'margin-top:8px' }, 'もう一度送る');
     const box = el('div', { class: 'msg err' }, msg, el('div', {}, again));
-    again.addEventListener('click', () => { box.remove(); deliver(text, img, thumb); });
+    again.addEventListener('click', () => {
+      if (busy) { toast('前の返事を待っています'); return; }
+      box.remove(); deliver(text, img, thumb);
+    });
     logEl.append(box);
     scrollDown();
   } finally {
@@ -376,8 +386,24 @@ function proposeCard(row) {
       el('span', { class: `p-conf ${meal.confidence === 'low' ? 'low' : ''}` },
         meal.confidence === 'high' ? '確度 高' : meal.confidence === 'low' ? '確度 低' : '確度 中'))));
 
+  // 手で直した分はDBの行へ書き戻す。書き戻さないと、続けて「味噌汁なし」と送ったとき
+  // AIには直す前の伝票が渡り、±した量が元に戻る
+  let persistTimer = null;
+  const persist = () => {
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(async () => {
+      const cur = (await db.allChat()).find((r) => r.id === row.id);
+      if (cur?.status !== 'pending') return;
+      const kept = items.filter((i) => !i.removed).map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c }));
+      await db.putChat({ ...cur, meal: { ...cur.meal, slot: slot.value, items: kept } });
+    }, 250);
+  };
+  slot.addEventListener('change', persist);
+
   const totalRow = el('div', { class: 'p-macros' });
+  let drawn = false;
   const recalc = () => {
+    if (drawn) persist();
     const t = sumItems(items.filter((i) => !i.removed));
     badge.textContent = `${fmt(t.kcal)} kcal`;
     totalRow.textContent = '';
@@ -413,6 +439,7 @@ function proposeCard(row) {
   drawRows();
   card.append(rows, totalRow);
   recalc();
+  drawn = true;
 
   if (meal.assumptions?.length) card.append(el('div', { class: 'p-assume' }, '仮定：' + meal.assumptions.join(' / ')));
   card.append(el('div', { class: 'p-assume' }, '違っていたら「ご飯は半分」「味噌汁なし」と送れば直ります'));

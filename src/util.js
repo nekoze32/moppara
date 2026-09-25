@@ -9,6 +9,7 @@ export function el(tag, attrs = {}, ...kids) {
     if (v == null || v === false) continue;
     if (k === 'class') n.className = v;
     else if (k === 'html') n.innerHTML = v;
+    else if (k === 'onclick' && typeof v === 'function') n.addEventListener('click', guardAsync(v));
     else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
     else if (k === 'dataset') Object.assign(n.dataset, v);
     else n.setAttribute(k, v === true ? '' : v);
@@ -18,6 +19,22 @@ export function el(tag, attrs = {}, ...kids) {
     n.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   }
   return n;
+}
+
+/**
+ * 非同期の処理が終わるまで、同じボタンの2回目の押下を捨てる。
+ * 反応の遅い端末で「記録する」を2回押すと、同じ食事が黙って2件入っていた。
+ */
+function guardAsync(fn) {
+  let running = false;
+  return (e) => {
+    if (running) return;
+    const r = fn(e);
+    if (r && typeof r.then === 'function') {
+      running = true;
+      r.finally(() => { running = false; });
+    }
+  };
 }
 
 // ---- 日付（ローカル時刻ベース。UTCに寄せない） ----

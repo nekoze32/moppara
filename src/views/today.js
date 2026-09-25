@@ -53,9 +53,9 @@ function backupNudge() {
   if (since != null && since < 14) return;
   const slot = el('div');
   root.append(slot);
-  db.allMeals().then((ms) => {
-    if (!ms.length) return;
-    const firstDay = ms.reduce((a, m) => (m.day < a ? m.day : a), ms[0].day);
+  db.mealDays().then((days) => {
+    if (!days.length) return;
+    const firstDay = days[0];
     const kept = Math.round((Date.parse(currentDay()) - Date.parse(firstDay)) / 86400000);
     if (since == null && kept < 14) return;
     slot.append(el('div', { class: 'banner' },
