@@ -108,6 +108,9 @@ export const putMeal = (m) => put('meals', m);
 export const delMeal = (id) => del('meals', id);
 export const mealsOf = (day) => byIndex('meals', 'day', day).then(sortByAt);
 export const allMeals = () => all('meals').then(sortByAt);
+/** from〜to（両端含む）の食事だけ。全件を読むと写真ごと数十MBになりうる */
+export const mealsBetween = (from, to) =>
+  tx('meals', 'readonly', (s) => s.index('day').getAll(IDBKeyRange.bound(from, to))).then(sortByAt);
 /** 記録のある日だけ（重複なし・昇順）。写真を含む本体を読まずに済む。 */
 export const mealDays = () => open().then((db) => new Promise((resolve, reject) => {
   const out = [];

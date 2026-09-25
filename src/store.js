@@ -185,7 +185,7 @@ export async function recentMeals(limit = 10) {
 
 // 直近n日ぶんの日別サマリ（推移タブとAIへの文脈で使う）
 export async function recentDays(n = 14) {
-  const meals = await db.allMeals();
+  const meals = await db.mealsBetween(addDays(state.realToday, -(n - 1)), state.realToday);
   const acts = await db.allActivities();
   const weights = await db.allWeights();
   const wmap = new Map(weights.map((w) => [w.day, w]));
