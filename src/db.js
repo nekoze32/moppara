@@ -106,18 +106,24 @@ export const setKV = (k, v) => tx('kv', 'readwrite', (s) => s.put(v, k));
 // ---- 食事 ----
 export const putMeal = (m) => put('meals', m);
 export const delMeal = (id) => del('meals', id);
+export const getMeal = (id) => one('meals', id);
 export const mealsOf = (day) => byIndex('meals', 'day', day).then(sortByAt);
 export const allMeals = () => all('meals').then(sortByAt);
 /** from〜to（両端含む）の食事だけ。全件を読むと写真ごと数十MBになりうる */
 export const mealsBetween = (from, to) =>
   tx('meals', 'readonly', (s) => s.index('day').getAll(IDBKeyRange.bound(from, to))).then(sortByAt);
 /** 記録のある日だけ（重複なし・昇順）。写真を含む本体を読まずに済む。 */
-export const mealDays = () => open().then((db) => new Promise((resolve, reject) => {
+const mealDaysOnce = () => open().then((db) => new Promise((resolve, reject) => {
   const out = [];
   const req = db.transaction('meals', 'readonly').objectStore('meals').index('day').openKeyCursor(null, 'nextunique');
   req.onsuccess = () => { const c = req.result; if (c) { out.push(c.key); c.continue(); } else resolve(out); };
   req.onerror = () => reject(req.error);
 }));
+export const mealDays = () => mealDaysOnce().catch((e) => {
+  if (e?.name !== 'InvalidStateError') throw e;
+  _db = null;
+  return mealDaysOnce();
+});
 
 // ---- 体重 ----
 export const putWeight = (w) => put('weights', w);
@@ -133,6 +139,7 @@ export const allActivities = () => all('activities');
 
 // ---- チャット ----
 export const putChat = (m) => put('chat', m);
+export const getChat = (id) => one('chat', id);
 export const delChat = (id) => del('chat', id);
 export const allChat = () => all('chat').then(sortByAt);
 export async function trimChat(keep = 300) {

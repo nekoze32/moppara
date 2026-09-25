@@ -1,6 +1,6 @@
 // 目標カロリーとPFCの計算。式は全部ここに置いて、画面側は数字を受け取るだけにする。
 
-import { r0, r1, clamp, daysBetween, ymd } from './util.js';
+import { r0, r1, clamp, daysBetween, ymd, addDays } from './util.js';
 
 export const ACTIVITY_LEVELS = [
   { key: 'sedentary', factor: 1.2,   label: '座位中心（運動は別に記録）' },
@@ -81,7 +81,10 @@ export function tdee(settings, weightKg) {
 // 目標日まで何kg／週で落とす必要があるか
 export function requiredPace(goal, currentKg, today = ymd()) {
   if (goal.mode === 'maintain') return 0;
-  if (!goal.targetWeightKg || !goal.targetDate) return Number(goal.manualPaceKgPerWeek) || 0;
+  if (!goal.targetWeightKg || !goal.targetDate) {
+    const p = Math.abs(Number(goal.manualPaceKgPerWeek) || 0);
+    return goal.mode === 'bulk' ? -p : p;   // 増量なのに赤字にしていた
+  }
   const days = daysBetween(today, goal.targetDate);
   if (days <= 0) return 0;
   const diff = Number(currentKg) - Number(goal.targetWeightKg); // 正なら減量
@@ -99,7 +102,8 @@ const KCAL_PER_KG = 7200;
  */
 export function dailyBudget(settings, weightKg, exerciseKcal = 0, today = ymd(), expenditure = null) {
   const formula = tdee(settings, weightKg);
-  const adaptive = !!(settings.goal.useAdaptive && expenditure?.kcal && expenditure.confidence !== 'low');
+  // usable は store が決める（中以上になったら、式に戻る理由が出るまで使い続ける。境目で上限が跳ねないため）
+  const adaptive = !!(settings.goal.useAdaptive && expenditure?.kcal && (expenditure.usable ?? expenditure.confidence !== 'low'));
   const base = adaptive ? expenditure.kcal : formula;
   const pace = requiredPace(settings.goal, weightKg, today); // kg/週（正=減量）
   const rawDeficit = (pace * KCAL_PER_KG) / 7;
@@ -159,19 +163,28 @@ const XP_MIN_WEIGH = 6;   // 体重の回数
 const XP_MIN_SPAN = 10;   // 体重の最初と最後が何日ひらいているか（短いと水分の上下を傾きと取り違える）
 
 function gatherXp(days, { floorKcal = 0, today = null, window = XP_WINDOW } = {}) {
-  // 今日はまだ食べ終わっていないので入れない
-  const rows = [...days]
-    .filter((d) => !today || d.day < today)
-    .sort((a, b) => a.day.localeCompare(b.day))
-    .slice(-window);
+  const sorted = [...days].sort((a, b) => a.day.localeCompare(b.day));
+  // 今日はまだ食べ終わっていないので摂取には入れない。体重は今朝の分まで使う（昨日食べた結果なので）
+  const rows = sorted.filter((d) => !today || d.day < today).slice(-window);
   const logged = rows.filter((d) => d.meals > 0);
   // 記録が極端に少ない日は「食べなかった」より「書き忘れた」のほうがずっと多い
-  const used = logged.filter((d) => d.kcal >= floorKcal);
-  const w = rows.filter((d) => d.weight != null);
+  // 1食だけ書き忘れた日は、ふだんの日の65%を切ることが多い。中央値を基準にそれも外す
+  const ks = logged.map((d) => d.kcal).sort((a, b) => a - b);
+  const median = ks.length ? ks[Math.floor(ks.length / 2)] : 0;
+  const cut = Math.max(floorKcal, median * 0.65);
+  const used = logged.filter((d) => d.kcal >= cut);
+  // 体重は摂取を数えた期間（最初の記録日〜最後の記録日の翌朝）に揃える。
+  // 揃えないと、記録していない前半の体重の動きまで摂取の平均で説明しようとしてずれる
+  const from = used.length ? used[0].day : null;
+  const to = used.length ? addDays(used[used.length - 1].day, 1) : null;
+  const w = sorted.filter((d) => d.weight != null && from && d.day >= from && d.day <= to);
   const t0 = w.length ? w[0].day : null;
   const weigh = w.map((d) => ({ t: daysBetween(t0, d.day), kg: Number(d.weight) }));
   const spanDays = weigh.length ? weigh[weigh.length - 1].t : 0;
-  return { used, excluded: logged.length - used.length, weigh, spanDays };
+  // 記録の抜け。抜けた日は「平均並みに食べた」扱いになるが、実際は食べ過ぎを書かなかった日が多い
+  const period = from ? daysBetween(from, rows[rows.length - 1].day) + 1 : 0;
+  const coverage = period ? used.length / period : 0;
+  return { used, excluded: logged.length - used.length, weigh, spanDays, coverage };
 }
 
 /** 実測に足りないもの。0なら足りている。 */
@@ -220,9 +233,10 @@ export function estimateExpenditure(days, opts = {}) {
   const kcal = clamp(raw, 1000, 5000);
 
   let confidence = 'low';
-  if (n >= 24 && m >= 18 && g.spanDays >= 21) confidence = 'high';
-  else if (n >= 18 && m >= 10 && g.spanDays >= 14) confidence = 'medium';
-  if (kcal !== raw) confidence = 'low';   // 範囲の外に出たなら、どこかの記録がおかしい
+  if (n >= 24 && m >= 18 && g.spanDays >= 21 && g.coverage >= 0.9) confidence = 'high';
+  else if (n >= 18 && m >= 10 && g.spanDays >= 14 && g.coverage >= 0.8) confidence = 'medium';
+  const clamped = kcal !== raw;
+  if (clamped) confidence = 'low';   // 範囲の外に出たなら、どこかの記録がおかしい
 
   return {
     kcal: r0(kcal),
@@ -233,5 +247,7 @@ export function estimateExpenditure(days, opts = {}) {
     weighIns: m,
     spanDays: g.spanDays,
     slopeKgPerWeek: Math.round(slope * 7 * 100) / 100,
+    coverage: Math.round(g.coverage * 100) / 100,
+    clamped,
   };
 }

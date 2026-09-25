@@ -32,7 +32,9 @@ function guardAsync(fn) {
     const r = fn(e);
     if (r && typeof r.then === 'function') {
       running = true;
-      r.finally(() => { running = false; });
+      // 共有シートのように決着しないことがある処理でボタンが死なないよう、10秒で解く
+      const t = setTimeout(() => { running = false; }, 10000);
+      r.finally(() => { clearTimeout(t); running = false; });
     }
   };
 }

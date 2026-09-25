@@ -61,7 +61,7 @@ function backupNudge() {
     slot.append(el('div', { class: 'banner' },
       since == null ? `${kept}日分の記録が、この端末の中だけにあります。` : `最後に書き出してから${since}日たちました。`,
       el('div', {}, el('button', { class: 'btn sm primary', onclick: doExport }, 'いま書き出す'))));
-  });
+  }).catch(() => { /* 催促が出ないだけ */ });
 }
 
 // ---------------------------------------------------------------- 献立

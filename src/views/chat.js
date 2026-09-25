@@ -183,6 +183,7 @@ function stampFor(day) {
 async function send() {
   const text = inputEl.value.trim();
   if (!text && !attached) return;
+  if (busy) { toast('前の返事を待っています。届いてから送ってください'); return; }   // 欄も写真も触らずに返す
   const img = attached?.dataUrl || null;
   inputEl.value = '';
   inputEl.style.height = 'auto';
@@ -204,12 +205,18 @@ async function sendWith(text, img) {
     return;
   }
   setBusy(true);   // 縮小と保存を待つ間に2通目が通らないよう、ここで立てる
-  const pics = [].concat(img || []);
-  const thumb = pics.length ? await thumbnail(pics[0]) : null;
-  const shown = text || (pics.length > 1 ? `（写真${pics.length}枚）` : '（写真）');
-  logEl.append(userBubble(shown, thumb));
-  scrollDown();
-  await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'user', text: shown, thumb });
+  let thumb = null;
+  try {
+    const pics = [].concat(img || []);
+    thumb = pics.length ? await thumbnail(pics[0]) : null;
+    const shown = text || (pics.length > 1 ? `（写真${pics.length}枚）` : '（写真）');
+    logEl.append(userBubble(shown, thumb));
+    scrollDown();
+    await db.putChat({ id: uid(), at: new Date().toISOString(), role: 'user', text: shown, thumb });
+  } catch (err) {
+    // ここで落ちると busy が立ったままになり、開き直すまで何も送れなくなる
+    console.warn('[moppara] 発話の保存に失敗', err);
+  }
   await deliver(text, img, thumb);
 }
 
@@ -289,8 +296,10 @@ async function deliver(text, img, thumb = null) {
       if (reserved) out.meal.slot = reserved;
       // 訂正なら古い伝票を下ろし、写真はそちらから引き継ぐ（訂正の発話に写真は付かない）
       // 待っている間に古い伝票が記録・取り消しされていたら、訂正ではなく新しい伝票として出す
-      const stillPending = pendingRow && (await db.allChat()).find((r) => r.id === pendingRow.id)?.status === 'pending';
-      const revising = out.revise && stillPending;
+      const latest = pendingRow ? await db.getChat(pendingRow.id) : null;
+      const revising = out.revise && latest?.status === 'pending';
+      // 待つ間に記録してしまっていたら、新しい1件ではなく記録済みの食事の置き換えとして出す（二重計上を防ぐ）
+      const replacesMealId = out.revise && latest?.status === 'saved' ? latest.mealId : null;
       if (revising) {
         await db.putChat({ ...pendingRow, status: 'revised' });
         logEl.querySelector(`[data-row="${pendingRow.id}"]`)?.replaceWith(revisedNote());
@@ -298,7 +307,8 @@ async function deliver(text, img, thumb = null) {
       // DOMだけに置くと開き直したとき消えて「記録済み」に見える。DBに持つ。
       const row = {
         id: uid(), at: new Date().toISOString(), role: 'proposal',
-        text: '', status: 'pending', meal: out.meal, thumb: thumb || (revising ? pendingRow.thumb : null), mealId: null,
+        text: '', status: 'pending', meal: out.meal, thumb: thumb || (revising || replacesMealId ? pendingRow.thumb : null), mealId: null,
+        replacesMealId,
       };
       await db.putChat(row);
       logEl.append(proposeCard(row));
@@ -381,7 +391,7 @@ function proposeCard(row) {
     ...['朝', '昼', '夜', '間食'].map((s) => el('option', { value: s, selected: s === meal.slot }, s)));
 
   card.append(el('div', { class: 'p-head' },
-    el('span', { class: 'p-title' }, '記録しますか'),
+    el('span', { class: 'p-title' }, row.replacesMealId ? '記録済みの分を直しますか' : '記録しますか'),
     el('span', { style: 'display:flex;gap:6px;align-items:center' }, slot,
       el('span', { class: `p-conf ${meal.confidence === 'low' ? 'low' : ''}` },
         meal.confidence === 'high' ? '確度 高' : meal.confidence === 'low' ? '確度 低' : '確度 中'))));
@@ -389,11 +399,13 @@ function proposeCard(row) {
   // 手で直した分はDBの行へ書き戻す。書き戻さないと、続けて「味噌汁なし」と送ったとき
   // AIには直す前の伝票が渡り、±した量が元に戻る
   let persistTimer = null;
+  let closed = false;   // 記録する・やめるを押したら、もう書き戻さない（確定した行を pending に戻してしまう）
   const persist = () => {
     clearTimeout(persistTimer);
     persistTimer = setTimeout(async () => {
-      const cur = (await db.allChat()).find((r) => r.id === row.id);
-      if (cur?.status !== 'pending') return;
+      if (closed) return;
+      const cur = await db.getChat(row.id);
+      if (closed || cur?.status !== 'pending') return;
       const kept = items.filter((i) => !i.removed).map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c }));
       await db.putChat({ ...cur, meal: { ...cur.meal, slot: slot.value, items: kept } });
     }, 250);
@@ -448,26 +460,29 @@ function proposeCard(row) {
   actions.append(
     el('button', {
       class: 'btn ghost',
-      onclick: async () => { await db.putChat({ ...row, status: 'cancelled' }); card.replaceWith(el('div', { class: 'msg sys' }, '記録しませんでした')); },
+      onclick: async () => { closed = true; clearTimeout(persistTimer); await db.putChat({ ...row, status: 'cancelled' }); card.replaceWith(el('div', { class: 'msg sys' }, '記録しませんでした')); },
     }, 'やめる'),
     el('button', {
       class: 'btn primary',
       onclick: async () => {
         const kept = items.filter((i) => !i.removed).map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c }));
         if (!kept.length) { toast('品目が残っていません'); return; }
-        const mealId = uid();
+        closed = true; clearTimeout(persistTimer);
+        // 記録済みの食事の訂正なら、新しく足さずにその食事を置き換える（日時はもとのまま）
+        const prev = row.replacesMealId ? await db.getMeal(row.replacesMealId) : null;
+        const mealId = prev?.id || uid();
         await db.putMeal({
-          id: mealId, day: targetDay(), at: stampFor(targetDay()),
-          slot: slot.value, items: kept, thumb: row.thumb || null, source: row.thumb ? 'photo' : 'text',
+          id: mealId, day: prev?.day || targetDay(), at: prev?.at || stampFor(targetDay()),
+          slot: slot.value, items: kept, thumb: row.thumb || prev?.thumb || null, source: row.thumb ? 'photo' : 'text',
         });
         const saved = { ...row, status: 'saved', mealId, meal: { ...meal, slot: slot.value, items: kept } };
         await db.putChat(saved);
         noteRecord(kept.map((i) => i.name).join('・'), sumItems(kept).kcal, sumItems(kept).p);
         await refresh();
         card.replaceWith(savedCard(saved));
-        toast('記録しました');
+        toast(prev ? '直しました' : '記録しました');
       },
-    }, '記録する'));
+    }, row.replacesMealId ? '置き換える' : '記録する'));
   card.append(actions);
   return card;
 }

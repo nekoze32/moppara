@@ -126,15 +126,31 @@ export async function refresh() {
     ? estimateExpenditure(await recentDays(29).catch(() => []),
       { floorKcal: expenditureFloor(state.settings, kg), today: state.realToday })
     : null;
+  if (state.expenditure) state.expenditure.usable = latchXp(state.expenditure);
+  else latchXp(null);
   state.budget = dailyBudget(state.settings, kg, state.exerciseKcal, state.today, state.expenditure);
   state.targets = macroTargets(state.settings, state.budget.budget, kg);
   state.eaten = sumMeals(state.meals);
   emit();
 }
 
-/** これ未満の日は書き忘れとみなす。基礎代謝の半分。 */
+/** これ未満の日は書き忘れとみなす。基礎代謝の7割（半分だと1食の書き忘れを拾えない）。 */
 export function expenditureFloor(settings, kg) {
-  return r0(bmr(settings.profile, kg) * 0.5);
+  return r0(bmr(settings.profile, kg) * 0.7);
+}
+
+/**
+ * 実測を上限に使ってよいか。確かさが中に届いたら、記録が足りなくなる（null）・抜けが増える・値が壊れる（範囲外）まで使い続ける。
+ * 境目の17日と18日を行き来するたびに上限が数百kcal跳ねると、何を信じればいいか分からなくなる。
+ */
+const XP_LATCH = 'moppara-xp-latched';
+function latchXp(xp) {
+  let on = false;
+  try { on = localStorage.getItem(XP_LATCH) === '1'; } catch { /* 読めなければ毎回判定 */ }
+  if (!xp || xp.clamped || xp.coverage < 0.75) on = false;   // 抜けが増えたら続けない（書かない日は食べ過ぎの日が多い）
+  else if (xp.confidence !== 'low') on = true;
+  try { localStorage.setItem(XP_LATCH, on ? '1' : '0'); } catch { /* 同上 */ }
+  return on;
 }
 
 export function remaining() {
