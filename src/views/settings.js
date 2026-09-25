@@ -31,9 +31,8 @@ function group(key, title, lines, build) {
   box.append(el('h2', {}, title));
 
   if (open !== key) {
-    box.append(el('div', { class: 'state' },
-      el('span', { class: 's-time' }, ''),
-      el('span', { class: 's-val', style: 'display:block' },
+    box.append(el('div', { class: 'state no-time' },
+      el('span', { class: 's-val', style: 'display:block;min-width:0;overflow-wrap:anywhere' },
         ...lines.map((t, i) => el('div', {
           style: i ? 'font-size:12px;color:var(--ink-faint);margin-top:2px' : 'font-size:13.5px',
         }, t))),
@@ -271,13 +270,13 @@ function groupOps() {
     `運動を上限に足す：${s.addExerciseToBudget ? 'する' : 'しない'}　／　${s.dayCutoffHour}時までは前日扱い`,
     s.prefs?.trim() ? `好み・制限：${s.prefs.trim().slice(0, 34)}${s.prefs.trim().length > 34 ? '…' : ''}` : '好み・制限は未記入',
   ], (body) => {
-    const ex = el('input', { type: 'checkbox', style: 'width:auto' });
+    const ex = el('input', { type: 'checkbox', style: 'width:22px;height:22px;flex:0 0 auto' });
     ex.checked = !!s.addExerciseToBudget;
     const cut = num(s.dayCutoffHour, '1');
     const prefs = el('textarea', { rows: '3', placeholder: '例：辛いものが苦手。えびアレルギー。会社の近くはサイゼとゆで太郎と松屋。' });
     prefs.value = s.prefs || '';
     body.append(
-      el('label', { style: 'display:flex;gap:9px;align-items:center;margin-bottom:12px;font-size:13.5px' },
+      el('label', { style: 'display:flex;gap:10px;align-items:center;min-height:44px;margin-bottom:8px;font-size:13.5px' },
         ex, '運動で消費した分を、その日の上限に足す'),
       field('何時までを前日扱いにするか', cut),
       el('div', { class: 'field' }, el('label', {}, '好み・制限・よく行く店'), prefs,

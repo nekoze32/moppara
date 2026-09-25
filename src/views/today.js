@@ -76,11 +76,21 @@ function momentCard() {
   let next;
   if (rem.kcal < 0) next = `今日は ${fmt(-rem.kcal)} kcal 超えました。明日で均せます。`;
   else if (rem.kcal < 300) next = `残り ${fmt(rem.kcal)} kcal。軽めの一品で締めるところです。`;
+  else if (rem.f < 0) next = `残り ${fmt(rem.kcal)} kcal。脂質はもう超えたので、揚げ物を避けて鶏むね・魚・豆腐を。`;
   else if (rem.p > 25 && r.p < 20) next = `残り ${fmt(rem.kcal)} kcal。たんぱく質があと ${rem.p}g、肉か魚を。`;
-  else next = `残り ${fmt(rem.kcal)} kcal。定食が入ります。`;
+  else if (rem.kcal >= 600) next = `残り ${fmt(rem.kcal)} kcal。定食が入ります。`;
+  else next = `残り ${fmt(rem.kcal)} kcal。丼より、主菜と汁物くらいに。`;
+  const names = String(r.label).split('・');
+  const label = names.length > 3 ? `${names.slice(0, 2).join('・')} ほか${names.length - 2}品` : r.label;
   return el('div', { class: 'moment' },
     el('div', { class: 'chk' }, '✓'),
-    el('div', { class: 'mt' }, `${r.label} を記録。`, el('b', {}, next)));
+    el('div', { class: 'mt' }, `${label} を記録。`, el('b', {}, next)));
+}
+
+/** 品目が多い食事は「先頭2つ ほかN品」。全部並べると1行が画面3つ分になっていた */
+function mealTitle(items) {
+  const names = items.map((i) => i.name);
+  return names.length <= 3 ? names.join('・') : `${names.slice(0, 2).join('・')} ほか${names.length - 2}品`;
 }
 
 /** 前後の日へ。昨日の食べ忘れを翌朝入れる、が一番ありがちな場面。 */
@@ -223,8 +233,8 @@ function mealRow(m) {
   return el('div', { class: 'meal', onclick: () => { editing = m.id; render(); } },
     ph,
     el('div', { class: 'm-body' },
-      el('div', { class: 'm-slot' }, `${hhmm(m.at)}${m.items.map((i) => i.amount).filter(Boolean).length ? '　' + m.items.map((i) => i.amount).filter(Boolean).join(' ／ ') : ''}`),
-      el('div', { class: 'm-name' }, m.items.map((i) => i.name).join('・')),
+      el('div', { class: 'm-slot' }, `${hhmm(m.at)}${m.items.length === 1 && m.items[0].amount ? '　' + m.items[0].amount : ''}`),
+      el('div', { class: 'm-name' }, mealTitle(m.items)),
       el('div', { class: 'm-kcal' }, fmt(t.kcal), el('small', {}, 'kcal')),
       el('div', { class: 'm-macro' }, `P ${r1(t.p)}　F ${r1(t.f)}　C ${r1(t.c)}`)));
 }
@@ -236,7 +246,9 @@ function mealEditor(m) {
   const box = el('div', { class: 'mealedit' });
 
   const save = async () => {
-    await db.putMeal({ ...m, slot: slot.value, items: items.map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c })) });
+    const kept = items.filter((i) => !i.removed).map(({ name, amount, kcal, p, f, c }) => ({ name, amount, kcal, p, f, c }));
+    if (!kept.length) { await removeMeal(m); return; }   // 全部外したなら食事ごと消す（取り消せる）
+    await db.putMeal({ ...m, slot: slot.value, items: kept });
     editing = null;
     await refresh();
     toast('直しました');
@@ -259,13 +271,14 @@ function mealEditor(m) {
   const totalKcal = el('b');
   const totalMacro = el('span', { class: 'faint' });
   const recalc = () => {
-    const t = sumItems(items);
+    const t = sumItems(items.filter((i) => !i.removed));
     totalKcal.textContent = `${fmt(t.kcal)} kcal`;
     totalMacro.textContent = `P ${r1(t.p)}　F ${r1(t.f)}　C ${r1(t.c)}`;
   };
 
-  for (const it of items) {
-    const inp = el('input', { type: 'number', inputmode: 'numeric', step: '10', value: String(it.kcal) });
+  const list = el('div');
+  const drawItem = (it) => {
+    const inp = el('input', { type: 'number', inputmode: 'numeric', step: '10', value: String(it.kcal), 'aria-label': `${it.name} kcal` });
     inp.addEventListener('input', () => {
       dirty = true;
       const v = Math.max(0, Number(inp.value) || 0);
@@ -276,10 +289,28 @@ function mealEditor(m) {
       it.c = Math.round(it.b.c * k * 10) / 10;
       recalc();
     });
-    box.append(el('div', { class: 'mrow' },
+    const line = el('div', { class: 'mrow' },
       el('span', { class: 'n' }, it.name, it.amount ? el('small', {}, it.amount) : null),
-      inp));
-  }
+      el('span', { class: 'ufi' }, inp, el('em', {}, 'kcal')),
+      el('button', { class: 'm-x', 'aria-label': `${it.name}を外す`, onclick: () => { it.removed = true; dirty = true; line.remove(); recalc(); } }, '×'));
+    list.append(line);
+  };
+  items.forEach(drawItem);
+  box.append(list);
+
+  // 食べ足したもの（食後のデザートなど）を同じ食事に足す。PFCは分からなければ0のまま
+  const addName = el('input', { type: 'text', placeholder: '品目を足す', 'aria-label': '足す品目' });
+  const addKcal = el('input', { type: 'number', inputmode: 'numeric', placeholder: 'kcal', 'aria-label': '足す品目 kcal' });
+  box.append(el('div', { class: 'm-add' }, addName, addKcal,
+    el('button', {
+      class: 'btn sm', onclick: () => {
+        const v = Number(addKcal.value);
+        if (!addName.value.trim() || !(v >= 0) || addKcal.value === '') { toast('品名とkcalを入れてください'); return; }
+        const it = { name: addName.value.trim(), amount: '', kcal: Math.round(v), p: 0, f: 0, c: 0, b: { kcal: Math.round(v) || 1, p: 0, f: 0, c: 0 } };
+        items.push(it); drawItem(it); dirty = true; recalc();
+        addName.value = ''; addKcal.value = '';
+      },
+    }, '足す')));
   recalc();
 
   box.append(el('div', { class: 'mtot' }, totalMacro, totalKcal));
@@ -312,12 +343,12 @@ function sectionWeight() {
       box.append(el('div', { class: 'state empty' },
         el('span', { class: 's-time' }, '— —'),
         el('span', { class: 's-val' }, state.isToday ? '今日の体重を入れる' : 'この日の体重を入れる'),
-        el('button', { class: 's-fix', onclick: () => { editing = 'weight'; render(); } }, 'ひらく')));
+        el('button', { class: 's-fix', onclick: () => { editing = 'weight'; render(); } }, '入れる')));
       return box;
     }
-    const kg = el('input', { type: 'number', step: '0.1', inputmode: 'decimal', value: w?.kg ?? '', placeholder: String(weightKg() ?? '') });
-    const fat = el('input', { type: 'number', step: '0.1', inputmode: 'decimal', value: w?.fatPct ?? '', placeholder: '体脂肪率 %' });
-    box.append(el('div', { class: 'editline' }, kg, fat,
+    const kg = el('input', { type: 'number', step: '0.1', inputmode: 'decimal', value: w?.kg ?? '', placeholder: `体重 kg${weightKg() ? `（前回 ${weightKg()}）` : ''}`, 'aria-label': '体重 kg' });
+    const fat = el('input', { type: 'number', step: '0.1', inputmode: 'decimal', value: w?.fatPct ?? '', placeholder: '体脂肪率 %（任意）', 'aria-label': '体脂肪率 %' });
+    box.append(el('div', { class: 'editline' }, unitField('体重', kg, 'kg'), unitField('体脂肪率', fat, '%'),
       el('span', { class: 'btns' },
         el('button', { class: 'btn sm', onclick: () => { editing = null; render(); } }, 'やめる'),
         el('button', {
@@ -373,9 +404,9 @@ function sectionActivity() {
   }
 
   if (editing === 'activity') {
-    const nm = el('input', { type: 'text', placeholder: '例：ランニング' });
-    const kc = el('input', { type: 'number', inputmode: 'numeric', placeholder: 'kcal' });
-    box.append(el('div', { class: 'editline' }, nm, kc,
+    const nm = el('input', { type: 'text', placeholder: '例：ランニング', 'aria-label': '種目' });
+    const kc = el('input', { type: 'number', inputmode: 'numeric', placeholder: '消費', 'aria-label': '消費カロリー kcal' });
+    box.append(el('div', { class: 'editline' }, unitField('種目', nm, ''), unitField('消費', kc, 'kcal'),
       el('span', { class: 'btns' },
         el('button', { class: 'btn sm', onclick: () => { editing = null; render(); } }, 'やめる'),
         el('button', {
@@ -393,7 +424,7 @@ function sectionActivity() {
     box.append(el('div', { class: 'state empty' },
       el('span', { class: 's-time' }, '— —'),
       el('span', { class: 's-val' }, state.activities.length ? '運動をもう1件つける' : 'チャットで「30分走った」でも入ります'),
-      el('button', { class: 's-fix', onclick: () => { editing = 'activity'; render(); } }, 'ひらく')));
+      el('button', { class: 's-fix', onclick: () => { editing = 'activity'; render(); } }, '追加')));
   }
 
   if (!state.settings.addExerciseToBudget && state.activities.length) {
@@ -434,6 +465,12 @@ function sectionPresets() {
         }, '消す'))));
   }
   return box;
+}
+
+/** 入力欄に見出しと単位を付ける。数字だけの箱では何を入れるのか分からなかった */
+function unitField(label, input, unit) {
+  return el('label', { class: 'ufield' }, el('span', { class: 'ufl' }, label),
+    el('span', { class: 'ufi' }, input, unit ? el('em', {}, unit) : null));
 }
 
 function slotNow() {

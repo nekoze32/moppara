@@ -2,13 +2,20 @@
 // 配色は dataviz の validate_palette で検証済み（styles.css の --chart-1/--chart-2 参照）。
 
 import { $, el, fmt, r0, r1, jpDate, clamp } from '../util.js';
-import { state, recentDays, weightKg, saveSettings, expenditureFloor } from '../store.js';
+import { state, recentDays, weightKg, saveSettings, expenditureFloor, setViewDay } from '../store.js';
 import { movingAverage, expenditureNeeds } from '../nutrition.js';
 
 let root;
 let range = 30;
 
-export function mount() { root = $('#trend-body'); }
+let goTab = () => {};
+export function mount({ navigate } = {}) { root = $('#trend-body'); if (navigate) goTab = navigate; }
+
+/** その日を今日タブで開く。気になった日を ‹ で何十回も遡らせない */
+async function openDay(day) {
+  await setViewDay(day);
+  goTab('today');
+}
 
 export async function render() {
   if (!root) return;
@@ -298,7 +305,8 @@ function weightChart(rows) {
     };
     hit.addEventListener('pointerenter', show);
     hit.addEventListener('pointerdown', show);
-    hit.addEventListener('pointerleave', () => { tip.hidden = true; });
+    // 指で触ると離した瞬間に pointerleave が来て、読む前に消えていた。指のときは残す
+    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
     svg.append(hit);
   });
 
@@ -347,21 +355,22 @@ function kcalChart(rows, budget) {
     const hit = svgEl('rect', { class: 'hit', x: cx - slot / 2, y: MT, width: slot, height: ih });
     const show = () => {
       tip.textContent = r.meals > 0
-        ? `${jpDate(r.day)}　${fmt(r.kcal)}kcal（P${r0(r.p)} F${r0(r.f)} C${r0(r.c)}）`
-        : `${jpDate(r.day)}　記録なし`;
+        ? `${jpDate(r.day)}　${fmt(r.kcal)}kcal（P${r0(r.p)} F${r0(r.f)} C${r0(r.c)}） ›`
+        : `${jpDate(r.day)}　記録なし ›`;
+      tip.onclick = () => openDay(r.day);
       tip.style.left = `${(cx / W) * 100}%`;
       tip.style.top = `${(y(Math.max(r.kcal, budget * 0.2)) / H) * 100}%`;
       tip.hidden = false;
     };
     hit.addEventListener('pointerenter', show);
     hit.addEventListener('pointerdown', show);
-    hit.addEventListener('pointerleave', () => { tip.hidden = true; });
+    // 指で触ると離した瞬間に pointerleave が来て、読む前に消えていた。指のときは残す
+    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
     svg.append(hit);
   });
 
   // 上限ライン（最前面）
   svg.append(svgEl('line', { class: 'refline', x1: ML, x2: W - MR, y1: y(budget), y2: y(budget) }));
-  svg.append(svgEl('text', { class: 'reflabel', x: W - MR, y: y(budget) - 4, 'text-anchor': 'end' }, `上限 ${fmt(budget)}`));
 
   svg.append(svgEl('text', { class: 'tick', x: ML, y: H - 5 }, jpDate(rows[0].day)));
   svg.append(svgEl('text', { class: 'tick', x: W - MR, y: H - 5, 'text-anchor': 'end' }, jpDate(rows[rows.length - 1].day)));
@@ -379,8 +388,8 @@ function table(rows) {
     el('th', {}, '運動'), el('th', {}, '体重'))));
   const tb = el('tbody');
   for (const r of [...rows].reverse()) {
-    tb.append(el('tr', {},
-      el('td', {}, jpDate(r.day)),
+    tb.append(el('tr', { class: 'tap', onclick: () => openDay(r.day) },
+      el('td', {}, jpDate(r.day), ' ›'),
       el('td', {}, r.meals ? fmt(r.kcal) : '—'),
       el('td', {}, r.meals ? r0(r.p) : '—'),
       el('td', {}, r.meals ? r0(r.f) : '—'),

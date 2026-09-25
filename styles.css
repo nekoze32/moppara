@@ -619,7 +619,8 @@ details.acc{border:none;box-shadow:var(--lift);border-radius:18px}
 /* 下の領域は帯のぶんだけ頭を空けておく（帯が縮んでもここは変えない） */
 .scroll{padding-top:calc(var(--bar-h) + 8px)}
 #chat-log{padding-top:calc(var(--bar-h) + 8px)}
-.warnbar,.daynotice{margin-top:var(--bar-h)}
+.warnbar{margin-top:var(--bar-h)}
+.composer .daynotice{border:none;border-radius:12px;margin:0 0 8px;padding:6px 6px 6px 12px}
 body.onboarding{--bar-h:0px}
 body.onboarding .statusbar{display:none}
 
@@ -739,3 +740,58 @@ body.onboarding .statusbar{display:none}
 .xp-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
          padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--ink-soft)}
 .xp-foot .btn{flex:0 0 auto}
+
+/* 縮めた帯は1行を守る。「残り」「過去」が1文字ずつ縦に割れていた */
+.mini-label,.mini-unit,.mini-date,.mini-kcal{white-space:nowrap;flex-shrink:0}
+.mini-pfc{min-width:0;overflow:hidden}
+@media (max-width:360px){.mini-pfc .sbar{width:18px}.mini-pfc{gap:6px}}
+/* PFCの超過量が右端で切れていた。超えたら数字の下に回す */
+.mrow{grid-template-columns:14px minmax(40px,1fr) auto}
+.mrow .v{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.mrow .v em{font-size:10.5px}
+/* 0%のとき、丸めた線端だけが点になって出ていた */
+#sb-ring.zero{visibility:hidden}
+.chat-log .msg{scroll-margin-top:calc(var(--bar-h) + 8px)}
+/* チャットでは入力欄の上に出す。タブバーの上だと入力欄と「登録」に重なっていた */
+body.on-chat .toast{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 96px)}
+/* 指で押すものは44px前後を確保する */
+.stp button{width:40px;height:40px}
+.p-mul .mul{min-height:30px;padding:5px 10px}
+.sheet-x{min-width:44px;min-height:44px}
+.toast button{min-height:36px;padding:0 6px}
+.state.no-time{grid-template-columns:minmax(0,1fr) auto}
+.ufield{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ufl{font-size:11.5px;color:var(--ink-faint);font-weight:700}
+.ufi{display:flex;align-items:center;gap:6px}
+.ufi input{flex:1;min-width:0}
+.ufi em{font-style:normal;font-size:12px;color:var(--ink-soft);flex:0 0 auto}
+.mealedit .mrow{grid-template-columns:minmax(0,1fr) 108px 36px}
+.m-x{width:36px;height:36px;border:none;border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:16px;font-weight:700}
+.m-add{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;padding:10px 0 2px}
+/* 推移から日を開く */
+.chartbox .tip{pointer-events:auto;cursor:pointer}
+.tbl tr.tap{cursor:pointer}
+.tbl tr.tap:active{background:var(--surface2)}
+/* 文字に使う色は背景用の色より一段濃くする（F 2.9:1 → 5.4:1、注意 3.2:1 → 4.9:1） */
+:root{--f-ink:#8F6211;--warn-ink:#8A5E0C}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--f-ink:var(--f);--warn-ink:var(--warn)}}
+:root[data-theme="dark"]{--f-ink:var(--f);--warn-ink:var(--warn)}
+.mrow.f .ml{color:var(--f-ink)}
+.daynotice,.p-conf.low,.statusbar.tight .mini-kcal{color:var(--warn-ink)}
+/* ダークでは柿色の上の白文字が3.7:1しかない。白を乗せる面だけ一段濃くする（5.3:1） */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.btn.primary,.msg.user,.icon-btn){background:#B8471F}}
+:root[data-theme="dark"] :is(.btn.primary,.msg.user,.icon-btn){background:#B8471F}
+.macro.f .lbl,.propose .p-conf.low,.wk-t.low b,.statusbar.tight .sb-num{color:var(--warn-ink)}
+.macro.f .lbl{color:var(--f-ink)}
+.banner{color:var(--warn-ink)}
+.p-item{grid-template-columns:minmax(0,1fr) auto 36px;gap:6px;padding:6px 0}
+.p-item .n{overflow-wrap:anywhere}
+.p-more{width:100%;margin-top:4px}
+.w-keylink{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;text-decoration:none}
+.w-steps{margin-top:10px;text-align:left}
+.w-steps summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer;color:var(--ink)}
+.w-steps ol{margin:4px 0 8px;padding-left:1.4em;line-height:1.7;color:var(--ink)}
+.sb-macros .mrow .v em{width:auto;height:auto;border-radius:0;background:none}
+.w-steps summary::after{content:'▾';margin-left:6px;color:var(--ink-faint)}
+.w-steps[open] summary::after{content:'▴'}
+.w-steps summary::-webkit-details-marker{display:none}
