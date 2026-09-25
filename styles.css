@@ -703,3 +703,35 @@ body.onboarding .statusbar{display:none}
 
 .d-foot{display:flex;gap:8px;margin-top:20px}
 .d-foot .btn{flex:1;padding:11px 12px;font-size:13.5px}
+
+/* ---- 推移：この7日 ----------------------------------------------------
+   週に一度見返す場所。数字は5つまで。多いと「で、どうすれば」が埋もれる。 */
+.wk,.xp{background:var(--surface);border-radius:18px;box-shadow:var(--lift);padding:12px 14px 14px}
+.wk-range{font-size:11.5px;font-weight:700;color:var(--ink-faint);font-variant-numeric:tabular-nums;margin-bottom:8px}
+.wk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.wk-t{background:var(--surface2);border-radius:12px;padding:8px 10px;min-width:0}
+.wk-t:last-child{grid-column:1 / -1}
+.wk-t em{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--ink-faint)}
+.wk-t b{display:block;font-family:var(--num);font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.2;margin:1px 0}
+.wk-t span{display:block;font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.wk-t.over b{color:var(--danger)}
+.wk-t.low b{color:var(--warn)}
+.wk-line{margin-top:10px;font-size:13px;line-height:1.65;color:var(--ink)}
+
+/* ---- 推移：実測の消費カロリー ---- */
+.xp-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.xp-nums > div{border-radius:12px;padding:8px 10px;background:var(--surface2);border:2px solid transparent}
+.xp-nums > div.on{border-color:var(--accent);background:var(--accent-soft)}
+.xp-nums em{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--ink-faint)}
+.xp-nums b{font-family:var(--num);font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-right:4px}
+.xp-nums span{font-size:11px;color:var(--ink-soft)}
+.xp-why{margin-top:9px;font-size:12.5px;line-height:1.65;color:var(--ink-soft)}
+.xp-meta{margin-top:6px;font-size:12px;line-height:1.6;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.xp-conf{display:inline-block;margin-right:7px;padding:1px 8px;border-radius:999px;font-weight:800;font-size:11px;
+         background:var(--surface2);color:var(--ink-soft)}
+.xp-conf.high{background:var(--ok-soft);color:var(--ok)}
+.xp-conf.medium{background:var(--surface3);color:var(--ink)}
+.xp-conf.low{background:var(--warn-soft);color:var(--warn)}
+.xp-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;
+         padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+.xp-foot .btn{flex:0 0 auto}

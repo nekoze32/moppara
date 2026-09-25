@@ -181,7 +181,7 @@ function groupBody() {
 function groupGoal() {
   const g = state.settings.goal;
   const kg = state.weight?.kg ?? state.latestWeight?.kg ?? g.startWeightKg ?? 70;
-  const b = dailyBudget(state.settings, kg, 0, state.today);
+  const b = dailyBudget(state.settings, kg, 0, state.today, state.expenditure);
   const t = macroTargets(state.settings, b.budget, kg);
   const mode = { diet: '減量', maintain: '維持', bulk: '増量' }[g.mode] || '—';
 
@@ -206,7 +206,7 @@ function groupGoal() {
     const preview = el('div', { class: 'card tight', style: 'margin-top:10px' });
     const repaint = () => {
       const probe = { ...state.settings, goal: { ...g, mode: mo.value, targetWeightKg: Number(tgt.value) || null, targetDate: date.value, manualPaceKgPerWeek: Number(pace.value) || 0 } };
-      const bb = dailyBudget(probe, kg, 0, state.today);
+      const bb = dailyBudget(probe, kg, 0, state.today, state.expenditure);
       const tt = macroTargets(probe, bb.budget, kg);
       preview.textContent = '';
       // append は null を文字列 "null" にするので、必ず絞ってから渡す
