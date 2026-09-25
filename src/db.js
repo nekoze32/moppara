@@ -58,16 +58,31 @@ function open() {
       if (!db.objectStoreNames.contains('chat')) db.createObjectStore('chat', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('presets')) db.createObjectStore('presets', { keyPath: 'id' });
     };
-    req.onsuccess = () => { _db = req.result; done(_db); };
+    req.onsuccess = () => {
+      _db = req.result;
+      // iOSは裏に置いたアプリの接続を切ることがある。切れたら次の読み書きで開き直す
+      _db.onclose = () => { _db = null; };
+      _db.onversionchange = () => { _db?.close(); _db = null; };
+      done(_db);
+    };
     req.onerror = () => fail(req.error?.message || '保存領域を開けませんでした');
   });
 }
 
 function tx(store, mode, fn) {
+  return txOnce(store, mode, fn).catch((e) => {
+    if (e?.name !== 'InvalidStateError') throw e;
+    _db = null;                       // 切れた接続を掴んでいた。1回だけ開き直す
+    return txOnce(store, mode, fn);
+  });
+}
+
+function txOnce(store, mode, fn) {
   return open().then(
     (db) =>
       new Promise((resolve, reject) => {
-        const t = db.transaction(store, mode);
+        let t;
+        try { t = db.transaction(store, mode); } catch (e) { reject(e); return; }
         const req = fn(t.objectStore(store));
         t.onerror = () => reject(t.error);
         t.onabort = () => reject(t.error);
@@ -91,8 +106,24 @@ export const setKV = (k, v) => tx('kv', 'readwrite', (s) => s.put(v, k));
 // ---- 食事 ----
 export const putMeal = (m) => put('meals', m);
 export const delMeal = (id) => del('meals', id);
+export const getMeal = (id) => one('meals', id);
 export const mealsOf = (day) => byIndex('meals', 'day', day).then(sortByAt);
 export const allMeals = () => all('meals').then(sortByAt);
+/** from〜to（両端含む）の食事だけ。全件を読むと写真ごと数十MBになりうる */
+export const mealsBetween = (from, to) =>
+  tx('meals', 'readonly', (s) => s.index('day').getAll(IDBKeyRange.bound(from, to))).then(sortByAt);
+/** 記録のある日だけ（重複なし・昇順）。写真を含む本体を読まずに済む。 */
+const mealDaysOnce = () => open().then((db) => new Promise((resolve, reject) => {
+  const out = [];
+  const req = db.transaction('meals', 'readonly').objectStore('meals').index('day').openKeyCursor(null, 'nextunique');
+  req.onsuccess = () => { const c = req.result; if (c) { out.push(c.key); c.continue(); } else resolve(out); };
+  req.onerror = () => reject(req.error);
+}));
+export const mealDays = () => mealDaysOnce().catch((e) => {
+  if (e?.name !== 'InvalidStateError') throw e;
+  _db = null;
+  return mealDaysOnce();
+});
 
 // ---- 体重 ----
 export const putWeight = (w) => put('weights', w);
@@ -108,6 +139,7 @@ export const allActivities = () => all('activities');
 
 // ---- チャット ----
 export const putChat = (m) => put('chat', m);
+export const getChat = (id) => one('chat', id);
 export const delChat = (id) => del('chat', id);
 export const allChat = () => all('chat').then(sortByAt);
 export async function trimChat(keep = 300) {
@@ -143,6 +175,12 @@ export async function exportAll() {
 
 export async function importAll(data, { replace = false } = {}) {
   if (!data || data.format !== 'moppara-export') throw new Error('この形式のファイルは読めません');
+  // 消してから1件ずつ入れるので、途中で落ちると消えたまま残る。消す前に全部確かめる
+  const bad = (rows, key) => (rows || []).some((r) => !r || r[key] == null);
+  if (bad(data.meals, 'id') || bad(data.weights, 'day') || bad(data.activities, 'id') || bad(data.presets, 'id') || bad(data.chat, 'id')
+      || (data.meals || []).some((m) => !Array.isArray(m.items))) {
+    throw new Error('ファイルの中身が壊れています。いまのデータには触っていません');
+  }
   if (replace) {
     const db = await open();
     for (const s of ['meals', 'weights', 'activities', 'presets', 'chat']) {
@@ -153,7 +191,6 @@ export async function importAll(data, { replace = false } = {}) {
       });
     }
   }
-  if (data.settings) await setKV('settings', data.settings);
   for (const m of data.meals || []) await put('meals', m);
   for (const w of data.weights || []) await put('weights', w);
   for (const a of data.activities || []) await put('activities', a);
@@ -162,6 +199,8 @@ export async function importAll(data, { replace = false } = {}) {
 }
 
 export async function wipeAll() {
+  // 控えを残すと、開き直したときにそこから設定とキーが書き戻される
+  try { localStorage.removeItem(MIRROR); localStorage.removeItem('moppara-last-export'); } catch { /* 無ければよい */ }
   const db = await open();
   for (const s of ['meals', 'weights', 'activities', 'presets', 'chat', 'kv']) {
     await new Promise((res, rej) => {

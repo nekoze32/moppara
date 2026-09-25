@@ -1,7 +1,7 @@
 // 設定。今日タブと同じ流儀で「いまの値＋修正」を出し、直すときだけ欄が開く。
 // 入力欄を出しっぱなしにして黙って保存すると、入れた側は反映されたか分からない。
 
-import { $, el, toast, r1, fmt } from '../util.js';
+import { $, el, toast, r1, fmt, hhmm, ymd } from '../util.js';
 import * as db from '../db.js';
 import { state, saveSettings, refresh } from '../store.js';
 import { ACTIVITY_LEVELS, dailyBudget, macroTargets, activityFactor } from '../nutrition.js';
@@ -31,9 +31,8 @@ function group(key, title, lines, build) {
   box.append(el('h2', {}, title));
 
   if (open !== key) {
-    box.append(el('div', { class: 'state' },
-      el('span', { class: 's-time' }, ''),
-      el('span', { class: 's-val', style: 'display:block' },
+    box.append(el('div', { class: 'state no-time' },
+      el('span', { class: 's-val', style: 'display:block;min-width:0;overflow-wrap:anywhere' },
         ...lines.map((t, i) => el('div', {
           style: i ? 'font-size:12px;color:var(--ink-faint);margin-top:2px' : 'font-size:13.5px',
         }, t))),
@@ -181,7 +180,7 @@ function groupBody() {
 function groupGoal() {
   const g = state.settings.goal;
   const kg = state.weight?.kg ?? state.latestWeight?.kg ?? g.startWeightKg ?? 70;
-  const b = dailyBudget(state.settings, kg, 0, state.today);
+  const b = dailyBudget(state.settings, kg, 0, state.today, state.expenditure);
   const t = macroTargets(state.settings, b.budget, kg);
   const mode = { diet: '減量', maintain: '維持', bulk: '増量' }[g.mode] || '—';
 
@@ -206,7 +205,7 @@ function groupGoal() {
     const preview = el('div', { class: 'card tight', style: 'margin-top:10px' });
     const repaint = () => {
       const probe = { ...state.settings, goal: { ...g, mode: mo.value, targetWeightKg: Number(tgt.value) || null, targetDate: date.value, manualPaceKgPerWeek: Number(pace.value) || 0 } };
-      const bb = dailyBudget(probe, kg, 0, state.today);
+      const bb = dailyBudget(probe, kg, 0, state.today, state.expenditure);
       const tt = macroTargets(probe, bb.budget, kg);
       preview.textContent = '';
       // append は null を文字列 "null" にするので、必ず絞ってから渡す
@@ -249,7 +248,14 @@ function groupMacro() {
   ], (body) => {
     const pg = num(m.proteinGPerKg, '0.1');
     const fp = num(Math.round(m.fatPctOfKcal * 100), '1');
+    // 数字の意味が分からないまま決めさせない。よくある型を押せば欄が埋まる
+    const TYPES = [['バランス', 1.6, 25], ['高たんぱく', 2.0, 25], ['ゆるい糖質制限', 1.8, 40]];
+    const types = el('div', { class: 'chips', style: 'margin:2px 0 10px' },
+      ...TYPES.map(([label, g, f]) => el('button', {
+        class: 'chip', onclick: () => { pg.value = String(g); fp.value = String(f); },
+      }, label)));
     body.append(
+      types,
       el('div', { class: 'grid2' }, field('たんぱく質 (g/目標体重kg)', pg), field('脂質 (総カロリーの%)', fp)),
       el('div', { class: 'hint' }, '減量中の目安は たんぱく質 1.6〜2.2g/kg、脂質 20〜30%。'));
     return () => ({ macro: { proteinGPerKg: Number(pg.value) || 1.8, fatPctOfKcal: (Number(fp.value) || 25) / 100 } });
@@ -264,13 +270,13 @@ function groupOps() {
     `運動を上限に足す：${s.addExerciseToBudget ? 'する' : 'しない'}　／　${s.dayCutoffHour}時までは前日扱い`,
     s.prefs?.trim() ? `好み・制限：${s.prefs.trim().slice(0, 34)}${s.prefs.trim().length > 34 ? '…' : ''}` : '好み・制限は未記入',
   ], (body) => {
-    const ex = el('input', { type: 'checkbox', style: 'width:auto' });
+    const ex = el('input', { type: 'checkbox', style: 'width:22px;height:22px;flex:0 0 auto' });
     ex.checked = !!s.addExerciseToBudget;
     const cut = num(s.dayCutoffHour, '1');
     const prefs = el('textarea', { rows: '3', placeholder: '例：辛いものが苦手。えびアレルギー。会社の近くはサイゼとゆで太郎と松屋。' });
     prefs.value = s.prefs || '';
     body.append(
-      el('label', { style: 'display:flex;gap:9px;align-items:center;margin-bottom:12px;font-size:13.5px' },
+      el('label', { style: 'display:flex;gap:10px;align-items:center;min-height:44px;margin-bottom:8px;font-size:13.5px' },
         ex, '運動で消費した分を、その日の上限に足す'),
       field('何時までを前日扱いにするか', cut),
       el('div', { class: 'field' }, el('label', {}, '好み・制限・よく行く店'), prefs,
@@ -309,7 +315,8 @@ function sectionData() {
   const box = el('div', { class: 'card' });
   box.append(el('h2', {}, 'データ'));
   box.append(el('div', { class: 'hint', style: 'margin:8px 0 10px' },
-    '記録はこの端末の中だけにあります。ときどき書き出してください。'));
+    '記録はこの端末の中だけにあります。ときどき書き出してください。',
+    lastExportText()));
 
   const diag = el('div', { class: 'card tight', style: 'margin:0 0 12px' }, '確認中…');
   box.append(diag);
@@ -333,6 +340,7 @@ function sectionData() {
 
   box.append(el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
     el('button', { class: 'btn sm', onclick: doExport }, '書き出す (JSON)'),
+    el('button', { class: 'btn sm', onclick: doExportCsv }, '表計算用 (CSV)'),
     el('label', { class: 'btn sm', for: 'import-file' }, '読み込む'),
     el('button', { class: 'btn sm danger', onclick: doWipe }, '全部消す')));
   const fileIn = el('input', { type: 'file', id: 'import-file', accept: 'application/json', hidden: true });
@@ -377,13 +385,75 @@ function num(value, step = '1') {
   return el('input', { type: 'number', inputmode: 'decimal', step, value: value ?? '' });
 }
 
-async function doExport() {
-  const data = await db.exportAll();
-  if (data.settings) data.settings = { ...data.settings, geminiKey: '', anthropicKey: '' };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = el('a', { href: URL.createObjectURL(blob), download: `moppara-${new Date().toISOString().slice(0, 10)}.json` });
+const LAST_EXPORT = 'moppara-last-export';
+
+/** 最後に書き出してから何日たったか。一度も無ければ null。 */
+export function daysSinceExport() {
+  try {
+    const t = localStorage.getItem(LAST_EXPORT);
+    return t ? Math.floor((Date.now() - Date.parse(t)) / 86400000) : null;
+  } catch { return null; }
+}
+
+function lastExportText() {
+  const d = daysSinceExport();
+  return d == null ? '（まだ一度も書き出していません）' : d === 0 ? '（今日書き出し済み）' : `（最後に書き出したのは${d}日前）`;
+}
+
+/**
+ * ファイルを端末に置く。iPhoneのホーム画面アプリでは download 属性が効かず画面が差し替わるだけなので、
+ * 共有シートが使えるならそちらで「ファイルに保存」させる。
+ * 共有シートはタップの直後でないと断られる（中身を作る待ち時間で切れる）。断られたら作った物を取っておき、
+ * もう一度押してもらう。2回目は待ち時間が無いので通る。
+ */
+let prepared = null;   // {name, file}
+async function saveFile(name, blob, type) {
+  const file = prepared?.name === name ? prepared.file : new File([blob], name, { type });
+  prepared = null;
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return 'shared'; }
+    catch (e) {
+      if (e.name === 'AbortError') return false;
+      if (e.name === 'NotAllowedError') { prepared = { name, file }; toast('準備できました。もう一度押すと保存先を選べます'); return false; }
+    }
+  }
+  const a = el('a', { href: URL.createObjectURL(file), download: name });
   document.body.append(a); a.click(); a.remove();
+  // ホーム画面アプリの download は効かないことがある。書き出せたとは言い切れないので記録しない
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  return standalone ? 'unsure' : 'downloaded';
+}
+
+export async function doExport() {
+  const name = `moppara-${ymd()}.json`;
+  let blob = null;
+  if (prepared?.name !== name) {
+    const data = await db.exportAll();
+    if (data.settings) data.settings = { ...data.settings, geminiKey: '', anthropicKey: '' };
+    blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  }
+  const r = await saveFile(name, blob, 'application/json');
+  if (!r) return;
+  if (r !== 'unsure') {
+    try { localStorage.setItem(LAST_EXPORT, new Date().toISOString()); } catch { /* 記録できなくても書き出しは済んでいる */ }
+  }
   toast('書き出しました（APIキーは含みません）');
+  if (root?.isConnected) render();
+}
+
+/** 品目ごとに1行。Excelで文字化けしないようBOMを付ける。 */
+async function doExportCsv() {
+  const [meals, weights] = await Promise.all([db.allMeals(), db.allWeights()]);
+  const wmap = new Map(weights.map((w) => [w.day, w.kg]));
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['日付', '時刻', '区分', '品名', '分量', 'kcal', 'P', 'F', 'C', 'その日の体重'].join(',')];
+  for (const m of meals) {
+    for (const i of m.items || []) {
+      lines.push([m.day, hhmm(m.at), m.slot, q(i.name), q(i.amount), i.kcal, i.p, i.f, i.c, wmap.get(m.day) ?? ''].join(','));
+    }
+  }
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv' });
+  if (await saveFile(`moppara-${ymd()}.csv`, blob, 'text/csv')) toast('CSVを書き出しました');
 }
 
 async function doImport(e) {
@@ -394,6 +464,12 @@ async function doImport(e) {
     const data = JSON.parse(await file.text());
     const replace = confirm('いまのデータを置き換えますか。\n［OK］置き換える　／　［キャンセル］今のデータに足す');
     await db.importAll(data, { replace });
+    // 設定は saveSettings を通す（控えも更新される）。書き出したファイルにキーは無いので、いまのキーは残す
+    if (data.settings) {
+      const s = state.settings;
+      await saveSettings({ ...data.settings, geminiKey: s.geminiKey, anthropicKey: s.anthropicKey,
+        provider: (data.settings.provider === 'anthropic' ? s.anthropicKey : s.geminiKey) ? data.settings.provider : s.provider });
+    }
     await refresh();
     render();
     toast('読み込みました');

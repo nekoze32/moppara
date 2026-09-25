@@ -37,8 +37,19 @@ export function render() {
     picked === 'gemini'
       ? '無料枠では、送った内容がGoogleの製品改善に使われます。気になる場合はAnthropicを選んでください。'
       : 'クレジットの購入が必要です。送った内容は学習に使われません。',
-    el('br'),
-    el('a', { href: p.keyUrl, target: '_blank', rel: 'noreferrer' }, 'キーを取得する（別のタブが開きます）'));
+    el('a', { class: 'btn sm w-keylink', href: p.keyUrl, target: '_blank', rel: 'noreferrer' }, 'キーを取りに行く（別のタブ）'),
+    keySteps(picked));
+}
+
+/** 「APIキー」が何か分からない人が最初の壁で止まっていた。手順を畳んで置く */
+function keySteps(provider) {
+  const steps = provider === 'gemini'
+    ? ['上のボタンで Google AI Studio を開き、Googleアカウントでログイン', '「APIキーを作成」を押す（クレジットカードは要りません）', '出てきた AIza… で始まる文字列をコピーして、上の欄に貼る']
+    : ['上のボタンで Anthropic Console を開き、アカウントを作る', 'Billing でクレジットを買う（5ドルで数か月もちます）', '「Create Key」で出た sk-ant-… をコピーして、上の欄に貼る'];
+  return el('details', { class: 'w-steps' },
+    el('summary', {}, 'キーの取り方（3ステップ・2分ほど）'),
+    el('ol', {}, ...steps.map((t) => el('li', {}, t))),
+    el('div', { class: 'faint' }, 'APIキーは、このアプリがAIを呼ぶための合言葉です。この端末の中にだけ保存します。'));
 }
 
 async function start() {

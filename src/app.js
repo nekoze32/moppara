@@ -19,7 +19,7 @@ async function boot() {
   welcome.mount({ navigate });
   chat.mount({ navigate, editMeal: (id) => today.openMeal(id) });
   today.mount({ navigate });
-  trend.mount();
+  trend.mount({ navigate });
   settings.mount();
   detail.mount({ navigate });
 
@@ -106,9 +106,10 @@ function bindCollapse() {
   const watchTop = (node) => node.addEventListener('scroll', () => {
     scrollC = clamp(node.scrollTop / range, 0, 1); paint();
   }, { passive: true });
+  // 背の低い画面のチャットは、帯を広げると会話が3分の1しか見えない。常に1行にしておく（タップで内訳は出る）
+  const chatC = (node) => (innerHeight < 700 ? 1 : clamp((node.scrollHeight - node.scrollTop - node.clientHeight) / range, 0, 1));
   const watchBottom = (node) => node.addEventListener('scroll', () => {
-    const d = node.scrollHeight - node.scrollTop - node.clientHeight;
-    scrollC = clamp(d / range, 0, 1); paint();
+    scrollC = chatC(node); paint();
   }, { passive: true });
   for (const s of $$('.scroll')) watchTop(s);
   watchBottom($('#chat-log'));
@@ -131,7 +132,7 @@ function bindCollapse() {
   bar.__measure = measure;
   bar.__recheck = () => {
     const log = $('#screen-chat:not([hidden]) #chat-log');
-    if (log) scrollC = clamp((log.scrollHeight - log.scrollTop - log.clientHeight) / range, 0, 1);
+    if (log) scrollC = chatC(log);
     else { const cur = $('.screen:not([hidden]) .scroll'); scrollC = cur ? clamp(cur.scrollTop / range, 0, 1) : 0; }
     paint();
   };
@@ -144,6 +145,7 @@ function bindCollapse() {
 function navigate(name) {
   current = name;
   document.body.classList.toggle('onboarding', name === 'welcome');
+  document.body.classList.toggle('on-chat', name === 'chat');
   for (const s of $$('.screen')) s.hidden = s.dataset.screen !== name;
   for (const b of $$('#tabbar .tab')) b.classList.toggle('is-on', b.dataset.go === name);
   if (name === 'welcome') welcome.render();
@@ -185,6 +187,8 @@ function paintStatusBar() {
   bar.classList.toggle('tight', tight);
 
   setLabel(state.isToday ? (over ? '超過' : '残り') : (over ? `${jpDate(state.today)} の超過` : `${jpDate(state.today)} の残り`));
+  // 縮めた帯は幅が無いので、日付は右端の日付欄に任せる
+  const miniLabel = over ? '超過' : '残り';
 
   // 数字が変わったときだけ小さく動かす
   const kcalEl = $('#sb-kcal');
@@ -197,8 +201,9 @@ function paintStatusBar() {
   }
   $('#sb-unit').textContent = 'kcal';
   $('#mini-kcal').textContent = next;
-  $('#mini-label').textContent = $('#sb-label').textContent;
-  $('#mini-date').textContent = state.isToday ? jpDate(state.today) : '過去の日';
+  // 小さい画面では右端の日付が消えるので、過去日のときはラベル側に日付を出す
+  $('#mini-label').textContent = state.isToday ? miniLabel : `${jpDate(state.today)}の${miniLabel}`;
+  $('#mini-date').textContent = jpDate(state.today);
   // 縮めた帯の右側は、数字でなく小さなバー3本（達成率が一目で分かる）
   const mp = $('#mini-pfc');
   mp.textContent = '';
@@ -215,6 +220,7 @@ function paintStatusBar() {
   ring.setAttribute('stroke-dasharray', `${(C * pct).toFixed(1)} ${C}`);
   ring.classList.toggle('over', over);
   ring.classList.toggle('tight', tight);
+  ring.classList.toggle('zero', pct <= 0);
   $('#sb-pct').textContent = `${Math.round(rem.pct * 100)}%`;
 
   // PFCは「摂取／目標」のバー。残りの数字だけでは目標の何割か分からない。超えたら朱。
@@ -227,7 +233,7 @@ function paintStatusBar() {
     m.append(el('div', { class: `mrow ${k}${isOver ? ' over' : ''}` },
       el('span', { class: 'ml' }, k.toUpperCase()),
       el('i', { class: 'bar' }, el('b', { style: `width:${w.toFixed(0)}%` })),
-      el('span', { class: 'v' }, el('b', {}, `${r0(got)}`), ` / ${r0(tgt)} g`, isOver ? el('em', {}, ` +${r0(got - tgt)}`) : null)));
+      el('span', { class: 'v' }, el('span', {}, el('b', {}, `${r0(got)}`), ` / ${r0(tgt)} g`), isOver ? el('em', {}, `+${r0(got - tgt)} 超`) : null)));
   }
 
   $('#sb-date').textContent = state.isToday ? jpDate(state.today) : '過去の日を見ています';

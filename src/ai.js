@@ -100,6 +100,7 @@ export function coerce(raw) {
   const out = {
     reply: String(o.reply || '').trim(), meal: null, weight: null, activity: null, setup: null,
     intent: INTENTS.includes(o.intent) ? o.intent : null,
+    revise: o.revise === true,
   };
 
   const m = o.meal;
@@ -171,7 +172,7 @@ function guessSlot(d = new Date()) {
  * @param {string} p.context   状況ブロック
  * @param {Array}  p.history   [{role:'user'|'assistant', text}]
  * @param {string} p.text      今回の発話
- * @param {string} [p.imageDataUrl]
+ * @param {string|string[]} [p.imageDataUrl]  1枚でも複数でも（料理と成分表示をまとめて送る場合）
  */
 export async function ask({ settings, context, history = [], text, imageDataUrl, signal, onRetry }) {
   const provider = settings.provider === 'anthropic' ? 'anthropic' : 'gemini';
@@ -190,8 +191,7 @@ async function askGemini({ settings, context, history, text, imageDataUrl, signa
     contents.push({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.text }] });
   }
   const parts = [];
-  const img = dataUrlParts(imageDataUrl);
-  if (img) parts.push({ inlineData: { mimeType: img.mime, data: img.b64 } });
+  for (const img of imageParts(imageDataUrl)) parts.push({ inlineData: { mimeType: img.mime, data: img.b64 } });
   parts.push({ text: `${context}\n\n---\n【利用者の発話】\n${text || '（写真のみ）'}` });
   contents.push({ role: 'user', parts });
 
@@ -269,8 +269,7 @@ async function askAnthropic({ settings, context, history, text, imageDataUrl, si
 
   const messages = history.map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.text }));
   const content = [];
-  const img = dataUrlParts(imageDataUrl);
-  if (img) content.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.b64 } });
+  for (const img of imageParts(imageDataUrl)) content.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.b64 } });
   content.push({ type: 'text', text: `${context}\n\n---\n【利用者の発話】\n${text || '（写真のみ）'}` });
   messages.push({ role: 'user', content });
 
@@ -383,6 +382,8 @@ export async function listModels(settings) {
 // ---------------------------------------------------------------- 雑用
 
 export class AIError extends Error {}
+
+const imageParts = (v) => [].concat(v || []).map(dataUrlParts).filter(Boolean);
 
 async function readJson(res) {
   const t = await res.text();
