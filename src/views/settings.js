@@ -249,7 +249,14 @@ function groupMacro() {
   ], (body) => {
     const pg = num(m.proteinGPerKg, '0.1');
     const fp = num(Math.round(m.fatPctOfKcal * 100), '1');
+    // 数字の意味が分からないまま決めさせない。よくある型を押せば欄が埋まる
+    const TYPES = [['バランス', 1.6, 25], ['高たんぱく', 2.0, 25], ['ゆるい糖質制限', 1.8, 40]];
+    const types = el('div', { class: 'chips', style: 'margin:2px 0 10px' },
+      ...TYPES.map(([label, g, f]) => el('button', {
+        class: 'chip', onclick: () => { pg.value = String(g); fp.value = String(f); },
+      }, label)));
     body.append(
+      types,
       el('div', { class: 'grid2' }, field('たんぱく質 (g/目標体重kg)', pg), field('脂質 (総カロリーの%)', fp)),
       el('div', { class: 'hint' }, '減量中の目安は たんぱく質 1.6〜2.2g/kg、脂質 20〜30%。'));
     return () => ({ macro: { proteinGPerKg: Number(pg.value) || 1.8, fatPctOfKcal: (Number(fp.value) || 25) / 100 } });
