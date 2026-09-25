@@ -2,8 +2,8 @@
 // 配色は dataviz の validate_palette で検証済み（styles.css の --chart-1/--chart-2 参照）。
 
 import { $, el, fmt, r0, r1, jpDate, clamp } from '../util.js';
-import { state, recentDays, weightKg } from '../store.js';
-import { movingAverage } from '../nutrition.js';
+import { state, recentDays, weightKg, saveSettings, expenditureFloor } from '../store.js';
+import { movingAverage, expenditureNeeds } from '../nutrition.js';
 
 let root;
 let range = 30;
@@ -12,7 +12,9 @@ export function mount() { root = $('#trend-body'); }
 
 export async function render() {
   if (!root) return;
-  const rows = await recentDays(range);
+  // 振り返りと実測は期間の切り替えに関係なく直近4週を使うので、多いほうで1回だけ読む
+  const all = await recentDays(Math.max(range, 29));
+  const rows = all.slice(-range);
   root.textContent = '';
 
   // ---- 期間 ----
@@ -24,6 +26,9 @@ export async function render() {
     }, `${n}日`));
   }
   root.append(seg);
+
+  // ---- この7日 ----
+  root.append(weekCard(all));
 
   // ---- 進捗の見出し数字 ----
   root.append(progressCard(rows));
@@ -68,11 +73,120 @@ export async function render() {
   }
   root.append(kCard);
 
+  // ---- 実測の消費カロリー ----
+  if (state.ready) root.append(expenditureCard(all));
+
   // ---- 数値で見る ----
   const tbl = el('details', { class: 'acc' });
   tbl.append(el('summary', {}, '数値で見る'));
   tbl.append(el('div', { class: 'acc-body', style: 'overflow-x:auto' }, table(rows)));
   root.append(tbl);
+}
+
+// ---------------------------------------------------------------- この7日
+
+// 今日はまだ途中なので、昨日までの7日で振り返る。AIは呼ばない。
+function weekCard(all) {
+  const week = all.slice(-8, -1);
+  const prev = all.slice(-15, -8);
+  const b = state.budget;
+  const t = state.targets;
+  const logged = week.filter((r) => r.meals > 0);
+  const card = el('div', { class: 'card' });
+  card.append(el('h2', {}, 'この7日'));
+  const box = el('div', { class: 'wk' });
+  card.append(box);
+  box.append(el('div', { class: 'wk-range' }, `${jpDate(week[0].day)}〜${jpDate(week[week.length - 1].day)}（今日は入れない）`));
+
+  if (!logged.length) {
+    box.append(el('div', { class: 'wk-line' }, 'この7日は記録がありません。'));
+    return card;
+  }
+
+  // 過去の上限は保存していないので、いまの上限（運動を除く）＋その日の運動で近似する
+  const addEx = state.settings.addExerciseToBudget && !b?.adaptive;
+  const plain = (b?.budget || 0) - (b?.exerciseAdded || 0);
+  const dayBudget = (r) => plain + (addEx ? r.exercise : 0);
+  const avg = logged.reduce((a, r) => a + r.kcal, 0) / logged.length;
+  const avgBudget = logged.reduce((a, r) => a + dayBudget(r), 0) / logged.length;
+  const within = logged.filter((r) => r.kcal <= dayBudget(r)).length;
+  const avgP = logged.reduce((a, r) => a + r.p, 0) / logged.length;
+
+  // 1回ずつだと水分のぶれをそのまま拾うので、両週とも2回以上あるときだけ比べる
+  const wAvg = (rs) => {
+    const w = rs.filter((r) => r.weight != null);
+    return w.length >= 2 ? w.reduce((a, r) => a + r.weight, 0) / w.length : null;
+  };
+  const wNow = wAvg(week), wPrev = wAvg(prev);
+  const dW = wNow != null && wPrev != null ? r1(wNow - wPrev) : null;
+
+  const tiles = el('div', { class: 'wk-grid' });
+  tiles.append(
+    wkTile('平均摂取', fmt(avg), state.ready ? `上限 ${fmt(avgBudget)} kcal` : 'kcal', state.ready && avg > avgBudget ? 'over' : ''),
+    wkTile('記録した日', `${logged.length}`, '／7日'),
+    wkTile('上限の内', state.ready ? `${within}` : '—', `／${logged.length}日`),
+    wkTile('平均P', fmt(avgP), t ? `目標 ${fmt(t.p)} g` : 'g', t && avgP < t.p * 0.9 ? 'low' : ''),
+    wkTile('体重（7日平均）', dW == null ? '—' : `${dW > 0 ? '+' : ''}${dW}`, dW == null ? '週2回ずつ量ると出ます' : 'kg　先週比'));
+  box.append(tiles);
+
+  // ひとことだけ。数字の言い直しではなく、次に何をすればいいかを書く。
+  let line;
+  if (!state.ready) line = '上限が決まると、上限との差も出ます。';
+  else if (logged.length < 5) line = `記録が${logged.length}日だけなので、平均はまだぶれます。`;
+  else if (avg > avgBudget) line = `平均で上限を ${fmt(avg - avgBudget)} kcal 超えています。多かった日を1日だけ見直すと効きます。`;
+  else if (t && avgP < t.p * 0.9) line = `カロリーは収まっています。たんぱく質が1日 ${fmt(t.p - avgP)}g ほど足りません。`;
+  else line = 'カロリーもたんぱく質も、平均では目標どおりです。';
+  box.append(el('div', { class: 'wk-line' }, line));
+  return card;
+}
+
+function wkTile(label, value, sub, cls = '') {
+  return el('div', { class: `wk-t ${cls}` }, el('em', {}, label), el('b', {}, value), el('span', {}, sub));
+}
+
+// ---------------------------------------------------------------- 実測の消費
+
+function expenditureCard(all) {
+  const s = state.settings;
+  const b = state.budget;
+  const xp = state.expenditure;
+  const on = !!s.goal.useAdaptive;
+  const card = el('div', { class: 'card' });
+  card.append(el('h2', {}, '実測の消費カロリー'));
+  const box = el('div', { class: 'xp' });
+  card.append(box);
+
+  box.append(el('div', { class: 'xp-nums' },
+    el('div', { class: b.adaptive ? 'on' : '' }, el('em', {}, '実測'), el('b', {}, xp ? fmt(xp.kcal) : '—'), el('span', {}, 'kcal／日')),
+    el('div', { class: b.adaptive ? '' : 'on' }, el('em', {}, '式（Mifflin）'), el('b', {}, fmt(b.formulaBase)), el('span', {}, 'kcal／日'))));
+  box.append(el('div', { class: 'xp-why' }, '直近4週の「食べた量」と「体重の動き」から逆算した、実際に使っている量です。'));
+
+  if (xp) {
+    const conf = { high: '高', medium: '中', low: '低' }[xp.confidence];
+    const diff = xp.kcal - b.formulaBase;
+    box.append(el('div', { class: 'xp-meta' },
+      el('span', { class: `xp-conf ${xp.confidence}` }, `確かさ ${conf}`),
+      `記録${xp.loggedDays}日・体重${xp.weighIns}回・${xp.spanDays}日間　式より${diff >= 0 ? '+' : '−'}${fmt(Math.abs(diff))}`));
+    if (xp.excluded) box.append(el('div', { class: 'xp-meta' }, `記録が少なすぎる${xp.excluded}日は、書き忘れとみなして外しました。`));
+    if (xp.confidence === 'low') box.append(el('div', { class: 'xp-meta' }, '確かさが「中」になるまでは、上限には使いません。'));
+  } else {
+    const need = expenditureNeeds(all, { floorKcal: expenditureFloor(s, weightKg() ?? 70), today: state.realToday });
+    const parts = [];
+    if (need.days) parts.push(`食事の記録${need.days}日`);
+    if (need.weights) parts.push(`体重${need.weights}回`);
+    else if (need.span) parts.push(`体重を量る期間${need.span}日`);
+    box.append(el('div', { class: 'xp-meta' }, `まだ出せません。あと${parts.join('・')}で出せます。`));
+    if (need.excluded) box.append(el('div', { class: 'xp-meta' }, `記録が少なすぎる${need.excluded}日は、書き忘れとみなして数えていません。`));
+  }
+
+  box.append(el('div', { class: 'xp-foot' },
+    el('span', {}, b.adaptive ? 'いまの上限は実測から' : on ? '実測が使えるようになったら切り替えます' : 'いまの上限は式から'),
+    el('button', {
+      class: `btn sm${on ? '' : ' primary'}`,
+      // 保存すると refresh → 購読でこのタブが描き直される
+      onclick: (e) => { e.currentTarget.disabled = true; saveSettings({ goal: { ...s.goal, useAdaptive: !on } }); },
+    }, on ? '式に戻す' : '上限に使う')));
+  return card;
 }
 
 // ---------------------------------------------------------------- 見出し数字

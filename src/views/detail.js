@@ -88,20 +88,36 @@ function card() {
   // ---- 上限の作り方
   const lv = ACTIVITY_LEVELS.find((l) => l.key === s.profile.activity) || ACTIVITY_LEVELS[0];
   const life = r0(b.base - b.bmr);
-  const budgetRows = [
-    row(`基礎代謝（${kg}kg・${s.profile.heightCm}cm）`, fmt(b.bmr)),
-    row(`生活で動く分（×${lv.factor}）`, `+${fmt(life)}`),
-    row('1日に使う分', fmt(b.base), 'sum'),
-  ];
+  const xp = state.expenditure;
+  // 元が式か実測かで、1日に使う分の出どころがまるで違う。どちらかを必ず見せる。
+  const budgetRows = b.adaptive
+    ? [
+      row(`直近${xp.loggedDays}日の平均摂取`, fmt(xp.intake)),
+      row(`体重の動き（${xp.slopeKgPerWeek > 0 ? '+' : ''}${xp.slopeKgPerWeek}kg／週）`,
+        `${xp.kcal >= xp.intake ? '+' : '−'}${fmt(Math.abs(xp.kcal - xp.intake))}`),
+      row('1日に使う分（実測）', fmt(b.base), 'sum'),
+    ]
+    : [
+      row(`基礎代謝（${kg}kg・${s.profile.heightCm}cm）`, fmt(b.bmr)),
+      row(`生活で動く分（×${lv.factor}）`, `+${fmt(life)}`),
+      row('1日に使う分（式）', fmt(b.base), 'sum'),
+    ];
   if (b.deficit > 0) budgetRows.push(row(`減らす分（${r1(b.paceKgPerWeek)}kg／週）`, `−${fmt(b.deficit)}`));
   else if (b.deficit < 0) budgetRows.push(row(`増やす分（${r1(Math.abs(b.paceKgPerWeek))}kg／週）`, `+${fmt(-b.deficit)}`));
-  if (b.exercise > 0) {
+  if (b.exercise > 0 && b.adaptive) {
+    budgetRows.push(row('運動（実測に入っているので足さない）', `${fmt(b.exercise)}`, 'muted'));
+  } else if (b.exercise > 0) {
     budgetRows.push(s.addExerciseToBudget
       ? row('運動で足した分', `+${fmt(b.exercise)}`)
       : row('運動（上限には足さない設定）', `${fmt(b.exercise)}`, 'muted'));
   }
   budgetRows.push(row('上限', fmt(b.budget), 'sum total'));
+  // 比べられるように、式の数字は最後に参考として置く（途中に挟むと足し引きの一部に見える）
+  if (b.adaptive) budgetRows.push(row(`参考：式で出した1日に使う分（×${lv.factor}）`, fmt(b.formulaBase), 'muted'));
   body.append(sec('上限の作り方', ...budgetRows));
+  if (s.goal.useAdaptive && !b.adaptive) {
+    body.append(note('実測の消費を使う設定ですが、まだ確かさが足りないので式の数字を使っています。推移タブで状況を見られます。'));
+  }
 
   if (b.cappedByFloor) {
     body.append(note('目標のペースどおりに引くと基礎代謝を割るので、割らないところで止めています。目標の日を後ろへずらすと、この上限は上がります。'));

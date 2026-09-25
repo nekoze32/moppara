@@ -1,7 +1,7 @@
 // アプリの状態。設定と「今日の集計」をここで持ち、変わったら購読者に投げる。
 
 import * as db from './db.js';
-import { mergeSettings, dailyBudget, macroTargets, missingProfile, DEFAULT_SETTINGS } from './nutrition.js';
+import { mergeSettings, dailyBudget, macroTargets, missingProfile, estimateExpenditure, bmr, DEFAULT_SETTINGS } from './nutrition.js';
 import { mealDay, sumMeals, ymd, addDays, r0 } from './util.js';
 
 const listeners = new Set();
@@ -18,6 +18,7 @@ export const state = {
   weight: null,       // {day, kg, fatPct}
   latestWeight: null, // 直近の記録（今日が無ければ遡る）
   budget: null,       // dailyBudget()の結果
+  expenditure: null,  // estimateExpenditure()の結果。足りなければnull
   targets: null,      // {p,f,c}
   eaten: { kcal: 0, p: 0, f: 0, c: 0 },
   exerciseKcal: 0,
@@ -120,10 +121,20 @@ export async function refresh() {
   state.ready = state.missing.length === 0;
   const kg = known ?? 70;
   state.exerciseKcal = state.activities.reduce((a, x) => a + (Number(x.kcal) || 0), 0);
-  state.budget = dailyBudget(state.settings, kg, state.exerciseKcal, state.today);
+  // 実測の消費は実際の今日から遡って出す（realToday を決めたあとでないと窓がずれる）
+  state.expenditure = state.ready
+    ? estimateExpenditure(await recentDays(29).catch(() => []),
+      { floorKcal: expenditureFloor(state.settings, kg), today: state.realToday })
+    : null;
+  state.budget = dailyBudget(state.settings, kg, state.exerciseKcal, state.today, state.expenditure);
   state.targets = macroTargets(state.settings, state.budget.budget, kg);
   state.eaten = sumMeals(state.meals);
   emit();
+}
+
+/** これ未満の日は書き忘れとみなす。基礎代謝の半分。 */
+export function expenditureFloor(settings, kg) {
+  return r0(bmr(settings.profile, kg) * 0.5);
 }
 
 export function remaining() {
