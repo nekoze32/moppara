@@ -41,6 +41,12 @@ export function mount({ navigate, editMeal }) {
     if (document.activeElement === inputEl) inputEl.blur();
   }, { passive: true });
 
+  // 取り消しトーストを入力欄のすぐ上に出すため、入力まわりの高さを測っておく（チップや過去日の知らせで変わる）
+  const comp = $('.composer');
+  if (window.ResizeObserver) new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--composer-h', `${comp.offsetHeight}px`);
+  }).observe(comp);
+
   restore();
   renderChips();
   paintDayNotice();
@@ -508,7 +514,8 @@ function proposeCard(row) {
           // ほかの記録と同じく取り消せるようにする。取り消したら伝票は確認待ちに戻す
           undoToast('記録しました', async () => {
             await db.delMeal(mealId);
-            const back = { ...row, status: 'pending', mealId: null };
+            const back = { ...saved, status: 'pending', mealId: null };   // 伝票で直した中身のまま戻す
+            state.lastRecord = null;   // 今日タブの「◯◯を記録。」を残さない
             await db.putChat(back);
             await refresh();
             logEl.querySelector(`[data-saved="${row.id}"]`)?.replaceWith(proposeCard(back));

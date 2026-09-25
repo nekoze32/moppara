@@ -257,7 +257,8 @@ function mealEditor(m) {
   // 入力欄・ボタン以外を叩いたら「閉じたい」と受け取る。
   // 変えた内容は捨てずに保存してから閉じる（「やめる」は捨てる側の道として残す）。
   box.addEventListener('click', (e) => {
-    if (e.target.closest('input, select, button, textarea, label, a')) return;
+    if (e.target.closest('input, select, button, textarea, label, a, .ufi, .m-add')) return;
+    if (addName.value.trim() || addKcal.value) { toast('足す品目が入ったままです。「足す」を押すか、欄を空にしてください'); return; }
     if (dirty) save(); else { editing = null; render(); }
   });
 

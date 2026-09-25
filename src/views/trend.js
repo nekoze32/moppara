@@ -259,6 +259,7 @@ function weightChart(rows) {
 
   const box = el('div', { class: 'chartbox' });
   const tip = el('div', { class: 'tip', hidden: true });
+  tip.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
   const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': '体重の推移' });
 
   // 目盛り
@@ -306,7 +307,7 @@ function weightChart(rows) {
     hit.addEventListener('pointerenter', show);
     hit.addEventListener('pointerdown', show);
     // 指で触ると離した瞬間に pointerleave が来て、読む前に消えていた。指のときは残す
-    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
+    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && e.relatedTarget !== tip) tip.hidden = true; });
     svg.append(hit);
   });
 
@@ -327,6 +328,7 @@ function kcalChart(rows, budget) {
 
   const box = el('div', { class: 'chartbox' });
   const tip = el('div', { class: 'tip', hidden: true });
+  tip.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
   const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': '日別の摂取カロリー' });
 
   for (let i = 0; i <= 2; i++) {
@@ -358,6 +360,7 @@ function kcalChart(rows, budget) {
         ? `${jpDate(r.day)}　${fmt(r.kcal)}kcal（P${r0(r.p)} F${r0(r.f)} C${r0(r.c)}） ›`
         : `${jpDate(r.day)}　記録なし ›`;
       tip.onclick = () => openDay(r.day);
+      tip.classList.add('go');
       tip.style.left = `${(cx / W) * 100}%`;
       tip.style.top = `${(y(Math.max(r.kcal, budget * 0.2)) / H) * 100}%`;
       tip.hidden = false;
@@ -365,7 +368,7 @@ function kcalChart(rows, budget) {
     hit.addEventListener('pointerenter', show);
     hit.addEventListener('pointerdown', show);
     // 指で触ると離した瞬間に pointerleave が来て、読む前に消えていた。指のときは残す
-    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') tip.hidden = true; });
+    hit.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && e.relatedTarget !== tip) tip.hidden = true; });
     svg.append(hit);
   });
 

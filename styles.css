@@ -753,7 +753,7 @@ body.onboarding .statusbar{display:none}
 #sb-ring.zero{visibility:hidden}
 .chat-log .msg{scroll-margin-top:calc(var(--bar-h) + 8px)}
 /* チャットでは入力欄の上に出す。タブバーの上だと入力欄と「登録」に重なっていた */
-body.on-chat .toast{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 96px)}
+body.on-chat .toast{bottom:calc(var(--composer-h, 150px) + 8px)}
 /* 指で押すものは44px前後を確保する */
 .stp button{width:40px;height:40px}
 .p-mul .mul{min-height:30px;padding:5px 10px}
@@ -769,7 +769,7 @@ body.on-chat .toast{bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 96p
 .m-x{width:36px;height:36px;border:none;border-radius:10px;background:var(--danger-soft);color:var(--danger);font-size:16px;font-weight:700}
 .m-add{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:8px;align-items:center;padding:10px 0 2px}
 /* 推移から日を開く */
-.chartbox .tip{pointer-events:auto;cursor:pointer}
+.chartbox .tip.go{pointer-events:auto;cursor:pointer}
 .tbl tr.tap{cursor:pointer}
 .tbl tr.tap:active{background:var(--surface2)}
 /* 文字に使う色は背景用の色より一段濃くする（F 2.9:1 → 5.4:1、注意 3.2:1 → 4.9:1） */

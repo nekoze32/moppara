@@ -201,7 +201,8 @@ function paintStatusBar() {
   }
   $('#sb-unit').textContent = 'kcal';
   $('#mini-kcal').textContent = next;
-  $('#mini-label').textContent = miniLabel;
+  // 小さい画面では右端の日付が消えるので、過去日のときはラベル側に日付を出す
+  $('#mini-label').textContent = state.isToday ? miniLabel : `${jpDate(state.today)}の${miniLabel}`;
   $('#mini-date').textContent = jpDate(state.today);
   // 縮めた帯の右側は、数字でなく小さなバー3本（達成率が一目で分かる）
   const mp = $('#mini-pfc');
